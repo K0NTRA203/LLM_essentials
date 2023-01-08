@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "curl": "^0.1.4",
+    "express": "^4.18.2",
+    "node": "^19.3.0",
+    "npm": "^9.2.0",
+    "react": "^18.2.0",
+    "react-scripts": "^2.1.3",
+    "semver": "^7.3.8",
+    "sqlite3": "^5.1.4"
+  },
+  "name": "chatgpt",
+  "version": "1.0.0",
+  "description": "chatgpt and playground clone",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "k0ntra",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  }
+}
