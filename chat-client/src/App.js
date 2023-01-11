@@ -7,6 +7,7 @@ const App = () => {
   const conversationIdRef = useRef(null);
   const parentMessageIdRef = useRef(null);
   const userPromptRef = useRef(null);
+  const convNameRef = useRef(null)
 
   const handleFormSubmit = (event) => {
     event.preventDefault();
@@ -15,17 +16,19 @@ const App = () => {
     const conversationId = conversationIdRef.current.value;
     const parentMessageId = parentMessageIdRef.current.value;
     const userPrompt = userPromptRef.current.value;
+    const convName = convNameRef.current.value;
 
     // Send a POST request to the server with the input values as the request body
     fetch('http://localhost:3002/chat', {
       method: 'POST',
-      body: JSON.stringify({ conversation_id: conversationId, parent_message_id: parentMessageId, user_prompt: userPrompt }),
+      body: JSON.stringify({ conversation_id: conversationId, parent_message_id: parentMessageId, user_prompt: userPrompt,conversation_name:convName }),
       headers: { 'Content-Type': 'application/json' },
     })
       .then((response) => response.json())
       .then((data) => {
         // Update the parentMessageId field and the serverResponse element with the response from the server
         parentMessageIdRef.current.value = data.parent_message_id;
+        conversationIdRef.current.value = data.conversation_id;
         document.getElementById('serverResponse').innerHTML = data.response;
       });
   };
@@ -36,11 +39,15 @@ const App = () => {
           <form onSubmit={handleFormSubmit}>
             <label htmlFor="conversationId">Conversation ID:</label>
             <br />
-            <input type="text" id="conversationId" ref={conversationIdRef} />
+            <input type="text" id="conversationId" ref={conversationIdRef} disabled/>
             <br />
             <label htmlFor="parentMessageId">Parent Message ID:</label>
             <br />
-            <input type="text" id="parentMessageId" ref={parentMessageIdRef} />
+            <input type="text" id="parentMessageId" ref={parentMessageIdRef} disabled/>
+            <br />
+            <label htmlFor="convName">Conversation Name:</label>
+            <br />
+            <input type="text" id="convName" ref={convNameRef} />
             <br />
             <label htmlFor="userPrompt">User Prompt:</label>
             <br />
