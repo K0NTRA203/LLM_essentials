@@ -1,0 +1,27 @@
+import { useRef } from 'react';
+
+const ConversationForm = ({ conversationName, handleConversationNameChange, conversationIdRef, parentMessageIdRef, handleFormSubmit, userPromptRef }) => {
+  return (
+    <form onSubmit={handleFormSubmit}>
+      <label htmlFor="conversationId">Conversation ID:</label>
+      <br />
+      <input type="text" id="conversationId" ref={conversationIdRef} disabled/>
+      <br />
+      <label htmlFor="parentMessageId">Parent Message ID:</label>
+      <br />
+      <input type="text" id="parentMessageId" ref={parentMessageIdRef} disabled/>
+      <br />
+      <label htmlFor="convName">Conversation Name:</label>
+      <br />
+      <input type="text" id="convName" value={conversationName} onChange={handleConversationNameChange} />
+      <br />
+      <label htmlFor="userPrompt">User Prompt:</label>
+      <br />
+      <textarea id="userPrompt" style={{ width: '80%', height: '200px' }} ref={userPromptRef} />
+      <br />
+      <button type="submit">Send</button>
+    </form>
+  );
+};
+
+export default ConversationForm;

@@ -1,0 +1,17 @@
+import React from 'react';
+const ConversationNameForm = ({ conversationName, handleConversationNameChange }) => {
+  return (
+    <form>
+      <label htmlFor="convName">Conversation Name:</label>
+      <br />
+      <input
+        type="text"
+        id="convName"
+        value={conversationName}
+        onChange={handleConversationNameChange}
+      />
+    </form>
+  );
+}
+
+export default ConversationNameForm;
