@@ -124,6 +124,7 @@ return (
         <textarea id="userPrompt" style={{ width: '80%', height: '100px' ,left: '50%'}} ref={userPromptRef} />
         
         <Button size='small' shape='circle' onClick={handleFormSubmit}>👀</Button>
+        <br />
         <input type="text" id="conversationId" ref={conversationIdRef} disabled/>
         <br />
         <input type="text" id="parentMessageId" ref={parentMessageIdRef} disabled/>

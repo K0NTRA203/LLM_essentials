@@ -10,8 +10,9 @@ import time
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 import openai_api
+import json
 
-app = Flask(__name__)
+app = Flask(__name__)       
 CORS(app)
 
 def asking(conversation_id, parent_message_id, user_prompt, token=''):
@@ -37,9 +38,53 @@ def asking(conversation_id, parent_message_id, user_prompt, token=''):
     #returning data back
     return response,bot.conversation_id, bot.parent_message_id
 
-@app.route('/playground')
+@app.route('/playground' , methods=['POST'])
 def playground_route():
-    openai_api.playground()
+    data = request.get_json()
+    name = data["name"]
+    engine = data["engine"]
+    prompt = data["prompt"]
+    max_tokens = data["maxTokens"]
+    n = data["n"]
+    stop = data["stop"]
+    temperature = data["temp"]
+    response = openai_api.playground(name,engine,prompt,max_tokens,n,stop,temperature)
+
+    resp =  make_response(jsonify({"result": response}))
+    resp.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+    return resp
+
+@app.route('/playground/names' , methods=['GET'])
+def playground_names():
+    #open connection to database
+    db = sqlite3.connect('database.db')
+    #set up a cursor to iterate over the database
+    cursor = db.cursor()
+    #CREATE TABLE IF DOES NOT EXIST
+    cursor.execute('''CREATE TABLE IF NOT EXISTS playground_messages
+            (id TEXT, name TEXT, model TEXT, prompt TEXT, choices BLOB, best_choice_text TEXT, timing INTEGER, warnings TEXT)''')
+    cursor.execute("PRAGMA table_info(playground_messages)")
+    columns = cursor.fetchall()
+    column_names = [col[1] for col in columns]
+    if set(column_names) != set(["id", "name", "model", "prompt", "choices", "best_choice_text", "timing", "warnings"]):
+        for col in ["id", "name", "model", "prompt", "choices", "best_choice_text", "timing", "warnings"]:
+            if col not in column_names:
+                cursor.execute(f"ALTER TABLE playground_messages ADD COLUMN {col}")
+        db.commit()
+    #get conversation_names from database
+    cursor.execute("SELECT DISTINCT name FROM playground_messages GROUP BY name")
+    res = cursor.fetchall()
+    conversation_names = []
+    for row in res:
+        conversation_names.append(row[0])
+    #close connection to database
+    db.close()
+    #return conversation_names to client
+    resp =  make_response(jsonify({"name": conversation_names}))
+    print('resp',resp)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET'
+    return resp
     
 @app.route('/names', methods=['GET'])
 def get_conversation_names():
@@ -58,8 +103,10 @@ def get_conversation_names():
     db.close()
     #return conversation_names to client
     resp =  make_response(jsonify({'conversation_names': conversation_names}))
-    resp.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET'
     return resp
+
 @app.route('/chat', methods=['DELETE'])
 def delete_conversation():
     data = request.get_json()

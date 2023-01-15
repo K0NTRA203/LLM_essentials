@@ -29,28 +29,32 @@
 # print(openai.Model.list())
 import sqlite3
 import openai
+import json
+
+
 
 def playground(name, engine, prompt, max_tokens, n, stop, temperature):
-        c.execute("INSERT INTO playground_me
+    print('name', name)
+    print('prompt', prompt)
+    print('engine', engine)
+    openai.api_key = "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"
     response = openai.Completion.create(
         engine=engine,
         prompt=prompt,
-        max_tokens=max_tokens,
+        max_tokens=int(max_tokens),
         n=n,
         stop=stop,
         temperature=temperature
     )
+    print(response.choices[0]['text'])
+    def response_to_db(name, prompt, response):
+        if prompt != None:
+            conn = sqlite3.connect('database.db')
+            c = conn.cursor()   
+            c.execute('''CREATE TABLE IF NOT EXISTS playground_messages
+                    (id TEXT, name TEXT, model TEXT, prompt TEXT, choices TEXT, best_choice_text TEXT, timing INTEGER, warnings TEXT)''')
+            
+            return response.choices[0]['text']
 
-    def response_to_db(name, response):
-        conn = sqlite3.connect('database.db')
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS playground_messages
-                (id INTEGER PRIMARY KEY, name TEXT, model TEXT, prompt TEXT, choices BLOB, best_choice_text TEXT, timing INTEGER, warnings TEXT)''')
-
-        c.execute("INSERT INTO playground_messages (id, name, model, prompt, choices, best_choice_text, timing, warnings) VALUES (?,?,?,?,?,?,?,?)",
-                (response.id, name, response.model, response.prompt, response.choices, response.choices[0]['text'], response.timing, response.warnings))
-        conn.commit()
-        conn.close()
-
-    response_to_db(name, response)
-    return response[0]['text']
+    response_to_db(name, prompt, response)
+    return response.choices[0]['text']

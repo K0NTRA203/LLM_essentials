@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Layout, Menu, Input, Slider, Card, Button } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Modal, Layout, Menu, Input, Slider, Card, Button,Space} from 'antd';
 
 const { Content, Sider } = Layout;
 
@@ -13,12 +13,16 @@ const Playground = () => {
   const [result, setResult] = useState('');
   const [prompt, setPrompt] = useState('');
   const [names, setNames] = useState([]);
+  const [name, setName] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
 
   const fetchNames = async () => {
     try {
-      const res = await fetch('/playground/names');
+      const res = await fetch('http://localhost:3002/playground/names');
+      
       const data = await res.json();
-      setNames(data);
+      console.log(data.name)
+      setNames(data.name);
     } catch (err) {
       console.error(err);
     }
@@ -28,18 +32,35 @@ const Playground = () => {
     fetchNames();
   }, []);
 
+  const handleNewChatClick = () => {
+    setModalVisible(true);
+  };
+  const handleModalConfirm = () => {
+    setModalVisible(false);
+  };
+  const handleModalCancel = () => {
+    setModalVisible(false);
+  };
+  
+  const handleNameChange = e => {
+    setName(e.target.value);
+  };
+  
+
   const handleSubmit = async e => {
     e.preventDefault();
     try {
-      const res = await fetch('/playground', {
+      const res = await fetch('http://localhost:3002/playground', {
         method: 'POST',
         body: JSON.stringify({
+          name,
           engine,
+          prompt,
           maxTokens,
           n,
           stop,
           temp,
-          history
+         
         }),
         headers: {
           'Content-Type': 'application/json'
@@ -51,17 +72,45 @@ const Playground = () => {
       console.error(err);
     }
   };
-  return (
+return (
     <Layout>
-      <Sider>
-        <Menu>
-          <Menu.Item key="1">New Chat</Menu.Item>
-          {names.map(name => (
-            <Menu.Item key={name}>{name}</Menu.Item>
-          ))}
-        </Menu>
-      </Sider>
-      <Content>
+<Sider>
+  <Menu>
+    <Menu.Item key="1" onClick={handleNewChatClick}>New Chat</Menu.Item>
+    {names.map(name => (
+      <Menu.Item key={name}>{name}</Menu.Item>
+    ))}
+  </Menu>
+</Sider>
+<Modal
+  title="Enter a name"
+  open={modalVisible}
+  onOk={handleModalConfirm}
+  onCancel={handleModalCancel}
+>
+  <Input value={name} onChange={handleNameChange} />
+</Modal>
+
+      
+<Content>
+<Space direction="vertical" size="large" style={{ display: 'flex' }}>
+      <Card title={name} height='50%' value={result}>
+       
+        </Card>
+    
+        
+      <div>
+          <Card>
+            <Input value={prompt} onChange={e => setPrompt(e.target.value)} />
+            
+            <Button type="primary" onClick={() => setPrompt('')}>
+              Send
+            </Button>
+          </Card>
+        </div>
+  </Space>
+</Content>
+        <Sider>
         <form onSubmit={handleSubmit}>
           <label>
             Engine:
@@ -122,19 +171,10 @@ const Playground = () => {
             Send
           </Button>
         </form>
-        <div>
-          <h2>Result:</h2>
-          <p>{result}</p>
-        </div>
-        <div>
-          <Card title="Prompt">
-            <Input value={prompt} onChange={e => setPrompt(e.target.value)} />
-            <Button type="primary" onClick={() => setPrompt('')}>
-              Clear
-            </Button>
-          </Card>
-        </div>
-      </Content>
+     
+
+      </Sider>
     </Layout>
   );
 };
+export default Playground;
