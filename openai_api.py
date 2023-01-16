@@ -33,7 +33,7 @@ import json
 
 
 
-def playground(name, engine, prompt, max_tokens, n, stop, temperature):
+def playground(name, engine, prompt, max_tokens, n, stop, temperature,tick=False):
     print('name', name)
     print('prompt', prompt)
     print('engine', engine)
@@ -42,19 +42,33 @@ def playground(name, engine, prompt, max_tokens, n, stop, temperature):
         engine=engine,
         prompt=prompt,
         max_tokens=int(max_tokens),
-        n=n,
+        n=int(n),
         stop=stop,
         temperature=temperature
     )
+    def response_to_db(name, response, engine, prompt):
+        conn = sqlite3.connect('database.db')
+        c = conn.cursor()
+        print(response)
+        c.execute("CREATE TABLE IF NOT EXISTS playground(id TEXT, name TEXT, model TEXT, prompt TEXT, all_choices TEXT, best_choice_text TEXT, time INTEGER, tokens INTEGER, tick BOOL)")
+        c.execute("INSERT INTO playground (id, name, model, prompt, all_choices, best_choice_text, time, tokens, tick) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (response.id,name, engine, prompt, '', response.choices[0].text, int(response.created), int(response.usage.total_tokens), tick))
+        conn.commit()
+        conn.close()
     print(response.choices[0]['text'])
-    def response_to_db(name, prompt, response):
-        if prompt != None:
-            conn = sqlite3.connect('database.db')
-            c = conn.cursor()   
-            c.execute('''CREATE TABLE IF NOT EXISTS playground_messages
-                    (id TEXT, name TEXT, model TEXT, prompt TEXT, choices TEXT, best_choice_text TEXT, timing INTEGER, warnings TEXT)''')
-            
-            return response.choices[0]['text']
 
-    response_to_db(name, prompt, response)
+
+    def delete_db(name):
+        try:
+            conn = sqlite3.connect('database.db')
+            cur = conn.cursor()
+            sql = 'DROP TABLE IF EXISTS ' + name
+            cur.execute(sql)
+            conn.commit()
+            conn.close()
+        except:
+            print('errror')
+    
+    # delete_db('playground')
+    response_to_db(name, response, engine, prompt)
+
     return response.choices[0]['text']

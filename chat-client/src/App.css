@@ -41,7 +41,9 @@ button:hover {
   color: #2d2d2d;
   border: 1px solid #2d2d2d;
 }
-
+.card-container .card-background {
+  background-color: #F5F5F5;
+}
 input {
   font-family: 'Roboto', sans-serif;
   font-size: 16px;

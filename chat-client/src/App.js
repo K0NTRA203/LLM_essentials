@@ -13,7 +13,7 @@ const App = () => {
   const parentMessageIdRef = useRef(null);
   const userPromptRef = useRef(null);
   const convNameRef = useRef(null);
-  const [page, setPage] = useState('conversation');
+  const [page, setPage] = useState('playground');
   const { conversationName, handleConversationNameChange } = useHandleConversationNameChange(
     conversationIdRef,
     parentMessageIdRef

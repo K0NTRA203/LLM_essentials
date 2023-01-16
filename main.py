@@ -51,33 +51,49 @@ def playground_route():
     response = openai_api.playground(name,engine,prompt,max_tokens,n,stop,temperature)
 
     resp =  make_response(jsonify({"result": response}))
-    resp.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'POST'
     return resp
+@app.route('/playground/messages' , methods=['GET'])
+def playground_messages():
+    name = request.args.get('name')
+    x = request.args.get('x')
+    print('NAME O X: ',name,x)
+    #open connection to database
+    db = sqlite3.connect('database.db')
+    cursor = db.cursor()
+    # get conversation_messages from database
+    if x != None:
+        cursor.execute("SELECT prompt, best_choice_text FROM playground WHERE name = ? ORDER BY time DESC LIMIT ?", (name, x))
+        print('CURRRRSORRRRR',cursor)
+    else: print('XXXXXX ISSSSSSS NONNNNNNE')
+    res = cursor.fetchall()
+    conversation_messages = []
+    for row in res:
+        conversation_messages.insert(0, {"prompt": row[0], "best_choice_text": row[1]})  
+          # close connection to database
+    db.close()
+    #return conversation_messages to client
+    resp =  make_response(jsonify({"messages": conversation_messages}))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET'
+    return resp
+
 
 @app.route('/playground/names' , methods=['GET'])
 def playground_names():
+    
     #open connection to database
     db = sqlite3.connect('database.db')
-    #set up a cursor to iterate over the database
     cursor = db.cursor()
-    #CREATE TABLE IF DOES NOT EXIST
-    cursor.execute('''CREATE TABLE IF NOT EXISTS playground_messages
-            (id TEXT, name TEXT, model TEXT, prompt TEXT, choices BLOB, best_choice_text TEXT, timing INTEGER, warnings TEXT)''')
-    cursor.execute("PRAGMA table_info(playground_messages)")
-    columns = cursor.fetchall()
-    column_names = [col[1] for col in columns]
-    if set(column_names) != set(["id", "name", "model", "prompt", "choices", "best_choice_text", "timing", "warnings"]):
-        for col in ["id", "name", "model", "prompt", "choices", "best_choice_text", "timing", "warnings"]:
-            if col not in column_names:
-                cursor.execute(f"ALTER TABLE playground_messages ADD COLUMN {col}")
-        db.commit()
-    #get conversation_names from database
-    cursor.execute("SELECT DISTINCT name FROM playground_messages GROUP BY name")
+    # cursor.execute("CREATE TABLE IF NOT EXISTS playground(id TEXT, name TEXT, model TEXT, prompt TEXT, all_choices TEXT, best_choice_text TEXT, time INTEGER, tokens INTEGER, tick BOOL)")
+    # get conversation_names from database
+    cursor.execute("SELECT DISTINCT name FROM playground GROUP BY name")
     res = cursor.fetchall()
     conversation_names = []
     for row in res:
         conversation_names.append(row[0])
-    #close connection to database
+    # close connection to database
     db.close()
     #return conversation_names to client
     resp =  make_response(jsonify({"name": conversation_names}))

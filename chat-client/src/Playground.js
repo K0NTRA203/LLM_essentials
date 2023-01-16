@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useRef, useState, useEffect } from 'react';
 import { Modal, Layout, Menu, Input, Slider, Card, Button,Space} from 'antd';
 
 const { Content, Sider } = Layout;
@@ -9,12 +9,60 @@ const Playground = () => {
   const [n, setN] = useState(1);
   const [stop, setStop] = useState('');
   const [temp, setTemp] = useState(0.5);
-  const [history, setHistory] = useState(1);
+  const [history, setHistory] = useState('');
   const [result, setResult] = useState('');
   const [prompt, setPrompt] = useState('');
   const [names, setNames] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [name, setName] = useState('');
+  const cardRef = useRef();
+  // On component mount
+  useEffect(() => {
+    cardRef.current.scrollTo(0, cardRef.current.scrollHeight);
+  }, [])
+
   const [modalVisible, setModalVisible] = useState(false);
+  useEffect(() => {
+    fetchMsgs();
+  }, [name, history]);
+  const cards = messages.map(message => {
+    console.log('salam')
+    return (
+      <div>
+        <Card style={{backgroundColor: '#c9f0ef'}}>
+          <p>🧠: {message.prompt}</p>
+        </Card>
+        <br></br>
+        <Card style={{backgroundColor: '#fbffba'}}>
+          <p>🤖: {message.best_choice_text}</p>
+        </Card>
+      </div>
+    );
+  });
+  const fetchMsgs = async () => {
+
+    try {
+      
+      if(!name || !history) return 
+      console.log(history)
+      const res = await fetch(`http://localhost:3002/playground/messages?name=${name}&x=${history}`);
+      const data = await res.json();
+      setMessages(data.messages);
+      console.log(messages)
+    } catch (err) {
+      console.error(err);
+    }
+}
+
+useEffect(() => {
+  
+    
+    fetchMsgs()
+  });
+
+
+
+
 
   const fetchNames = async () => {
     try {
@@ -29,7 +77,9 @@ const Playground = () => {
   }
 
   useEffect(() => {
+    
     fetchNames();
+ 
   }, []);
 
   const handleNewChatClick = () => {
@@ -50,6 +100,7 @@ const Playground = () => {
   const handleSubmit = async e => {
     e.preventDefault();
     try {
+      
       const res = await fetch('http://localhost:3002/playground', {
         method: 'POST',
         body: JSON.stringify({
@@ -65,7 +116,9 @@ const Playground = () => {
         headers: {
           'Content-Type': 'application/json'
         }
-      });
+      }).then(() => {
+        fetchMsgs();
+     });
       const data = await res.json();
       setResult(data.result);
     } catch (err) {
@@ -74,12 +127,13 @@ const Playground = () => {
   };
 return (
     <Layout>
-<Sider>
-  <Menu>
+      
+<Sider theme='light' style={{backgroundColor: '#e8dcec'}}>
+  <Menu style={{backgroundColor: '#d4d4d4'}}>
     <Menu.Item key="1" onClick={handleNewChatClick}>New Chat</Menu.Item>
     {names.map(name => (
-      <Menu.Item key={name}>{name}</Menu.Item>
-    ))}
+      <Menu.Item key={name} onClick={() => {setName(name); fetchMsgs()}}>{name}</Menu.Item>
+      ))}
   </Menu>
 </Sider>
 <Modal
@@ -92,25 +146,34 @@ return (
 </Modal>
 
       
-<Content>
+<Content style={{backgroundColor: '#d4d4d4'}}>
+<form onSubmit={handleSubmit}>
+
 <Space direction="vertical" size="large" style={{ display: 'flex' }}>
-      <Card title={name} height='50%' value={result}>
-       
-        </Card>
+  <Card ref={cardRef} title={name} height='50%' value={result} style={{ height: '400px', overflow: 'auto' }}>
+    {cards}
+  </Card>
     
         
       <div>
-          <Card>
-            <Input value={prompt} onChange={e => setPrompt(e.target.value)} />
+          <Card style={{backgroundColor: '#f0ecec'}}>
+            {/* <Input value={prompt} onChange={e => setPrompt(e.target.value)} /> */}
+            <>
+            <Input showCount maxLength={2000} onChange={e => setPrompt(e.target.value)} />
+            <br />
+            <br />
+   
+            </>
             
-            <Button type="primary" onClick={() => setPrompt('')}>
-              Send
-            </Button>
+           <Button type="primary" htmlType="submit">
+            Send
+          </Button>
           </Card>
         </div>
   </Space>
+  </form>
 </Content>
-        <Sider>
+        <Sider style={{backgroundColor: '#e8dcec'}}>
         <form onSubmit={handleSubmit}>
           <label>
             Engine:
@@ -147,7 +210,7 @@ return (
           <br />
           <label>
             Temperature:
-            <Slider
+            <Slider style={{backgroundColor: '#e8dcec'}}
               value={temp}
               onChange={setTemp}
               min={0}
@@ -161,15 +224,14 @@ return (
             <Input
               type="number"
               value={history}
-              onChange={e => setHistory(e.target.value)}
+              onChange={e => {setHistory(e.target.value); fetchMsgs()}}
               min={1}
               max={10}
-            />
+          />
+
           </label>
           <br />
-          <Button type="primary" htmlType="submit">
-            Send
-          </Button>
+    
         </form>
      
 
