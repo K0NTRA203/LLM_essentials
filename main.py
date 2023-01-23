@@ -1,4 +1,5 @@
 from chatgpt_wrapper import ChatGPT
+from openai_api import playground
 import chatgpt_wrapper
 import os
 import jsonlines
@@ -11,32 +12,17 @@ from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 import openai_api
 import json
+import embedding
+from embedding import import_knowledge, vectorize_knowledge, response_to_db, check_language, translate_prompt
+# doc = import_knowledge('knowledge/civil_code')
+# vectorize_knowledge(doc,'knowledge/civil_code.json')
+
+
 
 app = Flask(__name__)       
 CORS(app)
 
-def asking(conversation_id, parent_message_id, user_prompt, token=''):
-    #asking for response:
-    print('~~~porside shod~~~')
-    bot = ChatGPT()
-    if conversation_id != '':
-        bot.conversation_id = conversation_id
-        bot.parent_message_id = parent_message_id
-    
-    if token =='':
-        response = bot.ask(user_prompt)
-    else: 
-        response = bot.ask(user_prompt,token)
-    conversation_id = bot.conversation_id
 
-    #closing browser tasks:
-    for page in bot.browser.pages:
-        print('~~~dar hale bastan~~~')
-        page.close()
-       
-        
-    #returning data back
-    return response,bot.conversation_id, bot.parent_message_id
 
 @app.route('/playground' , methods=['POST'])
 def playground_route():
@@ -44,16 +30,30 @@ def playground_route():
     name = data["name"]
     engine = data["engine"]
     prompt = data["prompt"]
+    response = ''
     max_tokens = data["maxTokens"]
     n = data["n"]
     stop = data["stop"]
     temperature = data["temp"]
-    response = openai_api.playground(name,engine,prompt,max_tokens,n,stop,temperature)
+    if engine != 'davinci-qanoon-fa' and engine != 'davinci-qanoon-en':
+        response = openai_api.playground(name,engine,prompt,max_tokens,n,stop,temperature)
+    elif engine == 'davinci-qanoon-fa':
+        translated_prompt = translate_prompt(prompt,'en')
+        print('TRANSLATED TO: ',translated_prompt)
+        response = embedding.query(translated_prompt)
+        translated_response = translate_prompt(str(response), 'fa')
+        print('TRANSLATED RESPONSE: ', translated_response)
+        response_to_db(name,translated_response, engine, prompt)
+    elif engine == 'davinci-qanoon-en':
+        response = embedding.query(prompt)
+        response_to_db(name,str(response), engine, prompt)
 
+        
     resp =  make_response(jsonify({"result": response}))
     resp.headers['Access-Control-Allow-Origin'] = '*'
     resp.headers['Access-Control-Allow-Methods'] = 'POST'
     return resp
+
 @app.route('/playground/messages' , methods=['GET'])
 def playground_messages():
     name = request.args.get('name')
@@ -65,8 +65,7 @@ def playground_messages():
     # get conversation_messages from database
     if x != None:
         cursor.execute("SELECT prompt, best_choice_text FROM playground WHERE name = ? ORDER BY time DESC LIMIT ?", (name, x))
-        print('CURRRRSORRRRR',cursor)
-    else: print('XXXXXX ISSSSSSS NONNNNNNE')
+
     res = cursor.fetchall()
     conversation_messages = []
     for row in res:
@@ -135,6 +134,7 @@ def delete_conversation():
     conversation_names = c.fetchall()
     conn.close()
     return jsonify({'conversation_names': conversation_names})
+
 @app.route('/chat', methods=['POST'])
 def handle_request():
     # Get the conversation_id, parent_message_id, and user_prompt from the request body

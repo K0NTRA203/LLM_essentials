@@ -1,37 +1,35 @@
-
-
-# import os
-# if os.path.exists('conversation_history.txt'):
-#     # Load the file into the conversation_history variable
-#     with open('conversation_history.txt', 'r') as f:
-#         conversation_history = f.read()
-# else:
-#     # Set conversation_history to an empty string
-#     conversation_history = ''
-# openai.api_key = OPENAI_API
-# # df = pd.DataFrame([['', 2], [2, 3], [3, 4], [4, 5], [5, 6], ['a', 'b'], ['x', 'y'], ['y', 'z']], columns=['prompt', 'completion'])
-# def save_fine_tuning_data(path, df):
-#     # Extract the prompts and completions from the DataFrame
-#     prompts = df["prompt"].tolist()
-#     completions = df["completion"].tolist()
-#     prompts = [str(prompt) + " ->" for prompt in prompts]
-#     completions = [" " + str(completion) + "\n" for completion in completions]
-#     jsons = [{"prompt": prompt, "completion": completion} for prompt, completion in zip(prompts, completions)]
-#     # print(openai.File.list())
-#     # Open a JSONL file for writing
-#     with jsonlines.open(path, "w") as writer:
-#       # Write all of the dictionaries to the file
-#       writer.write_all(jsons)
-# save_fine_tuning_data("test.jsonl", df)
-# openai.File.create(file=open('test.jsonl','rb'),purpose='fine-tune')
-# openai.FineTune.create(training_file="file-DXA808APjcTd0IodxofPEzrx", model='babbage',suffix= 'arrrr')
-# print('lissssst')
-# print(openai.Model.list())
 import sqlite3
 import openai
 import json
+from chatgpt_wrapper import ChatGPT
+import chatgpt_wrapper
 
 
+# print('lissssst')
+# print(openai.Model.list())
+
+def asking(conversation_id, parent_message_id, user_prompt, token=''):
+    #asking for response:
+    print('~~~porside shod~~~')
+    bot = ChatGPT()
+    if conversation_id != '':
+        bot.conversation_id = conversation_id
+        bot.parent_message_id = parent_message_id
+    
+    if token =='':
+        response = bot.ask(user_prompt)
+    else: 
+        response = bot.ask(user_prompt,token)
+    conversation_id = bot.conversation_id
+
+    #closing browser tasks:
+    for page in bot.browser.pages:
+        print('~~~dar hale bastan~~~')
+        page.close()
+       
+        
+    #returning data back
+    return response,bot.conversation_id, bot.parent_message_id
 
 def playground(name, engine, prompt, max_tokens, n, stop, temperature,tick=False):
     print('name', name)

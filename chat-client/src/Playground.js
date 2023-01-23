@@ -1,41 +1,57 @@
 import React, {useRef, useState, useEffect } from 'react';
-import { Modal, Layout, Menu, Input, Slider, Card, Button,Space} from 'antd';
+import {Checkbox, Modal, Layout, Menu, Input, Slider, Card, Button,Space} from 'antd';
+
 
 const { Content, Sider } = Layout;
-
+const { TextArea } = Input;
 const Playground = () => {
   const [engine, setEngine] = useState('babbage:2020-05-03');
   const [maxTokens, setMaxTokens] = useState(100);
   const [n, setN] = useState(1);
   const [stop, setStop] = useState('');
   const [temp, setTemp] = useState(0.5);
-  const [history, setHistory] = useState('');
+  const [history, setHistory] = useState('1');
   const [result, setResult] = useState('');
   const [prompt, setPrompt] = useState('');
   const [names, setNames] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [tick, setTick] = useState(false);
+
+  
+  
+  
   const [name, setName] = useState('');
+  const [butt, setButt] = useState(false);
   const cardRef = useRef();
   // On component mount
   useEffect(() => {
     cardRef.current.scrollTo(0, cardRef.current.scrollHeight);
-  }, [])
+  }, [messages])
 
   const [modalVisible, setModalVisible] = useState(false);
   useEffect(() => {
     fetchMsgs();
-  }, [name, history]);
+    
+  }, [name, history,result]);
   const cards = messages.map(message => {
-    console.log('salam')
+    console.log('salam');
+    
     return (
       <div>
+      <div>
         <Card style={{backgroundColor: '#c9f0ef'}}>
-          <p>🧠: {message.prompt}</p>
+          
+          <p>🧠: {message.prompt} </p>
         </Card>
+      </div>
+      <br></br>
+      <div>
         <br></br>
         <Card style={{backgroundColor: '#fbffba'}}>
           <p>🤖: {message.best_choice_text}</p>
+
         </Card>
+      </div>
       </div>
     );
   });
@@ -48,17 +64,18 @@ const Playground = () => {
       const res = await fetch(`http://localhost:3002/playground/messages?name=${name}&x=${history}`);
       const data = await res.json();
       setMessages(data.messages);
+      // setEngine(data.engines);
       console.log(messages)
     } catch (err) {
       console.error(err);
     }
 }
 
-useEffect(() => {
+// useEffect(() => {
   
     
-    fetchMsgs()
-  });
+//     fetchMsgs()
+//   });
 
 
 
@@ -99,6 +116,8 @@ useEffect(() => {
 
   const handleSubmit = async e => {
     e.preventDefault();
+    setButt(true);
+    
     try {
       
       const res = await fetch('http://localhost:3002/playground', {
@@ -111,6 +130,7 @@ useEffect(() => {
           n,
           stop,
           temp,
+          tick
          
         }),
         headers: {
@@ -118,6 +138,8 @@ useEffect(() => {
         }
       }).then(() => {
         fetchMsgs();
+        setPrompt('');
+        setButt(false);
      });
       const data = await res.json();
       setResult(data.result);
@@ -148,30 +170,20 @@ return (
       
 <Content style={{backgroundColor: '#d4d4d4'}}>
 <form onSubmit={handleSubmit}>
-
-<Space direction="vertical" size="large" style={{ display: 'flex' }}>
-  <Card ref={cardRef} title={name} height='50%' value={result} style={{ height: '400px', overflow: 'auto' }}>
-    {cards}
-  </Card>
-    
-        
-      <div>
-          <Card style={{backgroundColor: '#f0ecec'}}>
-            {/* <Input value={prompt} onChange={e => setPrompt(e.target.value)} /> */}
-            <>
-            <Input showCount maxLength={2000} onChange={e => setPrompt(e.target.value)} />
-            <br />
-            <br />
-   
-            </>
-            
-           <Button type="primary" htmlType="submit">
-            Send
-          </Button>
-          </Card>
-        </div>
-  </Space>
-  </form>
+  <Space direction="vertical" size="large" style={{ display: 'flex' }}>
+    <Card ref={cardRef} title={name} height='50%' value={result} style={{ height: '400px', overflow: 'auto' }}> {cards} </Card> 
+    <div> 
+      <Card style={{backgroundColor: '#f0ecec'}}>
+         {/* <Input value={prompt} onChange={e => setPrompt(e.target.value)} /> */} 
+         <> 
+         <TextArea value={prompt} showCount maxLength={100000} onChange={e => setPrompt(e.target.value)} onKeyPress={e => {if (e.key === 'Enter') handleSubmit(e);}} /> 
+         <br /> <br /> 
+         
+         </>
+        <Button disabled={butt} type="primary" htmlType="submit">Send</Button>
+      </Card> 
+        </div> 
+        </Space> </form>
 </Content>
         <Sider style={{backgroundColor: '#e8dcec'}}>
         <form onSubmit={handleSubmit}>
@@ -179,8 +191,13 @@ return (
             Engine:
             <select value={engine} onChange={e => setEngine(e.target.value)}>
               <option value="babbage:2020-05-03">Babbage 2020-05-03</option>
+              <option value="text-davinci-003">davinci</option>
+
               <option value="curie:2020-05-03">Curie 2020-05-03</option>
               <option value="davinci:2020-05-03">Davinci 2020-05-03</option>
+              <option value="davinci-qanoon-fa">QANOON-FARSI</option>
+              <option value="davinci-qanoon-en">QANOON-ENGLISH</option>
+              
             </select>
           </label>
           <br />

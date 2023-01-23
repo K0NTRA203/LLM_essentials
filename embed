@@ -1,0 +1,74 @@
+import tiktoken
+import pandas
+from openai.embeddings_utils import get_embedding, cosine_similarity
+df = pandas.DataFrame()
+
+
+"""DATAFRAME NEEDED FOR THIS PROJECT IS LIKE THIS:
+FILEPATH/PARAGRAPH/KEYWORDS/N_TOKENS/EMBEDDING
+WITH EVERY PARAGRAPH SEPERATED"""
+
+# def tokenize_chunks_nltk(file_path, chunk_size):
+#     with open(file_path, 'r') as f:
+#         text = f.read()
+#     # Tokenize the text into sentences
+#     sentences = sent_tokenize(text)
+#     chunks = []
+#     for sent in sentences:
+#         # Tokenize each sentence into words
+#         words = word_tokenize(sent)
+#         if len(words) > chunk_size:
+#             # Divide the words into chunks of the specified size
+#             chunks.extend([words[i:i+chunk_size] for i in range(0, len(words), chunk_size)])
+#         else:
+#             chunks.append(words)
+#     return chunks
+
+def _tiktoken_encoding(df, max_tokens = 1000, model = 'cl100k_base'):
+    encoding = tiktoken.get_encoding(model)
+    
+    df_new = df.copy()
+    # Index of all rows that need to be divided
+    rows_to_divide = [index for index, row in df.iterrows() if len(encoding.encode(row['paragraph'])) > max_tokens]
+    # Iterate over all rows to divide
+    while rows_to_divide:
+        # Get index of current row to divide
+        index = rows_to_divide.pop(0)
+        row = df.loc[index]
+        
+        # Divide paragraph into two entries
+        half_idx = (len(row['paragraph']) // 2)
+        first_half = row['paragraph'][:half_idx]
+        second_half = row['paragraph'][half_idx:]
+
+        # Update first entry
+        df_new.at[index, 'paragraph'] = first_half
+        df_new.at[index, 'n_tokens'] = len(encoding.encode(first_half))
+
+        # Create second entry
+        df_new = df_new.append({
+            'filepath': row['filepath'],
+            'paragraph': second_half,
+            'keywords': row['keywords'],
+            'n_tokens': len(encoding.encode(second_half)),
+            'embedding': row['embedding']
+        }, ignore_index=True)
+        
+        # Check if second entry needs to be divided further
+        if df_new.loc[df_new.index[-1], 'n_tokens'] > max_tokens:
+            rows_to_divide.append(df_new.index[-1])
+            
+    return df_new
+
+def df_embedding(df, out_loc = 'knowledge/embedded.csv', model='text-embedding-ada-002'):
+    df_new = _tiktoken_encoding(df)
+    df_new['embedding'] = df_new.paragraph.apply(lambda x: get_embedding(x, model=model))
+    df_new.to_csv(out_loc, index=False)
+    return df_new
+
+def similarity():
+    return
+
+# loading shit:
+# df = pd.read_csv('output/embedded_1k_reviews.csv')
+# df['ada_embedding'] = df.ada_embedding.apply(eval).apply(np.array)
