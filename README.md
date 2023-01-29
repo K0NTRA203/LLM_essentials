@@ -1,5 +1,5 @@
 # chatgpt_clone
-# Python/Node.js clone for chatgpt/playground + embedding; saves chatlog db
+# Python clone for chatgpt/playground + embedding; Node/React UI; Saves chatlog db.
 
 ##########################################################
 # embedding doesnt have UI yet. for embedding use "embed.py"
