@@ -1,4 +1,4 @@
-# chatgpt_clone
+# LLM_essentials
 # Python clone for chatgpt/playground + embedding; Node/React UI; Saves chatlog db.
 
 ##########################################################
