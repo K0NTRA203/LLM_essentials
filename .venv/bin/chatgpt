@@ -1,16 +1,16 @@
 #!"/home/k0ntra/Public/MY REPOS/CHATGPT/.venv/bin/python3"
-# EASY-INSTALL-ENTRY-SCRIPT: 'chatGPT==0.3.6','console_scripts','chatgpt'
+# EASY-INSTALL-ENTRY-SCRIPT: 'chatGPT==0.3.8','console_scripts','chatgpt'
 import re
 import sys
 
 # for compatibility with easy_install; see #2198
-__requires__ = 'chatGPT==0.3.6'
+__requires__ = 'chatGPT==0.3.8'
 
 try:
     from importlib.metadata import distribution
 except ImportError:
     try:
-        from importlib.metadata import distribution
+        from importlib_metadata import distribution
     except ImportError:
         from pkg_resources import load_entry_point
 
@@ -30,4 +30,4 @@ globals().setdefault('load_entry_point', importlib_load_entry_point)
 
 if __name__ == '__main__':
     sys.argv[0] = re.sub(r'(-script\.pyw?|\.exe)?$', '', sys.argv[0])
-    sys.exit(load_entry_point('chatGPT==0.3.6', 'console_scripts', 'chatgpt')())
+    sys.exit(load_entry_point('chatGPT==0.3.8', 'console_scripts', 'chatgpt')())

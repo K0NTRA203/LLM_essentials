@@ -1,6 +1,5 @@
-from chatgpt_wrapper import ChatGPT
+from lib.chatgpt_wrapper import ChatGPT
 from openai_api import playground
-import chatgpt_wrapper
 import os
 import jsonlines
 import json
@@ -10,15 +9,40 @@ import numpy as np
 import time
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
-import openai_api
+import subprocess
+from playwright.sync_api import sync_playwright
 import json
-import embedding
+import embedding, embed
+import threading
 from embedding import import_knowledge, vectorize_knowledge, response_to_db, check_language, translate_prompt
 # doc = import_knowledge('knowledge/civil_code')
 # vectorize_knowledge(doc,'knowledge/civil_code.json')
 
 
+def start_browser(method = 'start'):
 
+    global browser
+    if method == 'start':
+        playwright = sync_playwright().start()
+        browser = playwright.firefox.launch_persistent_context(
+            user_data_dir="/tmp/playwright",
+            headless=False)
+        browser.pages[0].goto("https://chat.openai.com/")
+        print('************************PLAYWRIGHT READY')
+    elif method == 'refresh':
+        print('*******************REFRESHING PLAYWRIGHT')
+        #closing browser tasks:
+        for page in browser.pages:
+            page.close()
+        subprocess.run("pkill -f playwright", shell=True)
+        playwright = sync_playwright().start()
+        browser = playwright.firefox.launch_persistent_context(
+            user_data_dir="/tmp/playwright",
+            headless=True)
+        browser.pages[0].goto("https://chat.openai.com/")
+        print('************************PLAYWRIGHT READY')
+
+    
 app = Flask(__name__)       
 CORS(app)
 
@@ -35,8 +59,8 @@ def playground_route():
     n = data["n"]
     stop = data["stop"]
     temperature = data["temp"]
-    if engine != 'davinci-qanoon-fa' and engine != 'davinci-qanoon-en':
-        response = openai_api.playground(name,engine,prompt,max_tokens,n,stop,temperature)
+    if engine != 'davinci-qanoon-fa' and engine != 'davinci-qanoon-en' and engine != 'davinci-sina' and engine != 'labour-law' and engine != 'labour-law-fa':
+        response = playground(name,engine,prompt,max_tokens,n,stop,temperature)
     elif engine == 'davinci-qanoon-fa':
         translated_prompt = translate_prompt(prompt,'en')
         print('TRANSLATED TO: ',translated_prompt)
@@ -47,6 +71,19 @@ def playground_route():
     elif engine == 'davinci-qanoon-en':
         response = embedding.query(prompt)
         response_to_db(name,str(response), engine, prompt)
+    elif engine == 'davinci-sina':
+        response,tokens = embed.query_intel(prompt,'code_knowledge/sina_embedding2.csv','text-davinci-003', 1000)
+        response_to_db(name,str(response), engine, prompt,tokens=tokens)
+    elif engine == 'labour-law':
+        response,tokens = embed.query_intel(prompt,'knowledge/labour_law.csv','text-davinci-003', 1000)
+        response_to_db(name,str(response), engine, prompt,tokens=tokens)
+    elif engine == 'labour-law-fa':
+        translated_prompt = translate_prompt(prompt,'en')
+        print('TRANSLATED TO: ',translated_prompt)
+        response,tokens = embed.query_intel(translated_prompt,'knowledge/labour_law.csv','text-davinci-003', 1000)
+        translated_response = translate_prompt(str(response), 'fa')
+        print('TRANSLATED RESPONSE: ', translated_response)
+        response_to_db(name,translated_response, engine, prompt, tokens=tokens)
 
         
     resp =  make_response(jsonify({"result": response}))
@@ -73,11 +110,11 @@ def playground_messages():
           # close connection to database
     db.close()
     #return conversation_messages to client
+    print(conversation_messages)
     resp =  make_response(jsonify({"messages": conversation_messages}))
     resp.headers['Access-Control-Allow-Origin'] = '*'
     resp.headers['Access-Control-Allow-Methods'] = 'GET'
     return resp
-
 
 @app.route('/playground/names' , methods=['GET'])
 def playground_names():
@@ -100,8 +137,19 @@ def playground_names():
     resp.headers['Access-Control-Allow-Origin'] = '*'
     resp.headers['Access-Control-Allow-Methods'] = 'GET'
     return resp
-    
-@app.route('/names', methods=['GET'])
+
+@app.route('/playground/names', methods=['DELETE'])
+def delete_names():   
+    data = request.get_json()
+    name = data['name']
+    db = sqlite3.connect('database.db')
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM playground WHERE name=?", (name,))
+    db.commit()
+    db.close()
+    return jsonify({"message": f"Successfully deleted all messages with name {name}"})
+
+@app.route('/gpt/names/', methods=['GET'])
 def get_conversation_names():
 
     #open connection to database
@@ -109,7 +157,7 @@ def get_conversation_names():
     #set up a cursor to iterate over the database
     cursor = db.cursor()
     #get conversation_names from database
-    cursor.execute("SELECT DISTINCT conversation_name FROM chat_messages GROUP BY conversation_name")
+    cursor.execute("SELECT DISTINCT conversation_name FROM chat_messages ORDER BY ROWID DESC")
     res = cursor.fetchall()
     conversation_names = []
     for row in res:
@@ -117,40 +165,70 @@ def get_conversation_names():
     #close connection to database
     db.close()
     #return conversation_names to client
-    resp =  make_response(jsonify({'conversation_names': conversation_names}))
+    resp =  make_response(jsonify({'name': conversation_names}))
     resp.headers['Access-Control-Allow-Origin'] = '*'
     resp.headers['Access-Control-Allow-Methods'] = 'GET'
     return resp
 
-@app.route('/chat', methods=['DELETE'])
+@app.route('/gpt/names', methods=['DELETE'])
 def delete_conversation():
     data = request.get_json()
-    conversation_name = data['conversation_name']
+    conversation_name = data['conv_name']
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
     c.execute("DELETE FROM chat_messages WHERE conversation_name=?", (conversation_name,))
     conn.commit()
-    c.execute("SELECT DISTINCT conversation_name FROM chat_messages GROUP BY conversation_name")
-    conversation_names = c.fetchall()
+    # c.execute("SELECT DISTINCT conversation_name FROM chat_messages GROUP BY conversation_name")
+    # conversation_names = c.fetchall()
     conn.close()
-    return jsonify({'conversation_names': conversation_names})
+    resp = jsonify({"message": f"Successfully deleted all messages with name {conversation_name}"})
 
-@app.route('/chat', methods=['POST'])
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET'
+
+    return resp
+
+@app.route('/gpt/messages', methods=['GET'])
+def gpt_history():
+    name = request.args.get('name')
+    x = request.args.get('x')
+    print('NAME O X: ',name,x)
+    #open connection to database
+    db = sqlite3.connect('database.db')
+    cursor = db.cursor()
+    # get conversation_messages from database
+    if x != None:
+        cursor.execute("SELECT user_prompt, response FROM chat_messages WHERE conversation_name = ? ORDER BY ROWID DESC LIMIT ?", (name, x))
+
+    res = cursor.fetchall()
+    conversation_messages = []
+    for row in res:
+        conversation_messages.insert(0, {"user_prompt": row[0], "response": row[1]})  
+          # close connection to database
+    db.close()
+    #return conversation_messages to client
+    print(conversation_messages)
+    resp =  make_response(jsonify({"messages": conversation_messages}))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET'
+    return resp
+
+@app.route('/gpt', methods=['POST'])
 def handle_request():
+    global browser
+    conversation_id= ''
+    parent_message_id=''
     # Get the conversation_id, parent_message_id, and user_prompt from the request body
     data = request.get_json()
     print('~~~data oomad~~~',data)
-    conversation_id = data['conversation_id']
-    parent_message_id = data['parent_message_id']
-    user_prompt = data['user_prompt']
-    conversation_name = data['conversation_name']
-    # print('convName',conversation_name)
+    user_prompt = data['prompt']
+    conversation_name = data['name']
     # Open a connection to the database
     db = sqlite3.connect('database.db')
-    
-    # Set up a cursor to iterate over the database
     cursor = db.cursor()
-    cursor.execute("SELECT conversation_id, parent_message_id FROM chat_messages WHERE conversation_name=? ORDER BY conversation_id DESC LIMIT 1", (conversation_name,))
+    cursor.execute("SELECT conversation_id, parent_message_id FROM chat_messages WHERE conversation_name=? ORDER BY ROWID DESC LIMIT 1", (conversation_name,))
+    #TODO Multi-Threading conversations using this line:
+    # cursor.execute("SELECT conversation_id, parent_message_id FROM chat_messages WHERE conversation_name=? ORDER BY conversation_id DESC LIMIT 1", (conversation_name,))
     res = cursor.fetchone()
     if res != None:
         print('CONVERSATION EXISTS')
@@ -158,11 +236,37 @@ def handle_request():
         conversation_id = res[0]
         parent_message_id = res[1]
         print('EXISTING CONVERSATION:', conversation_id,parent_message_id)
-    # tok = ''
-    tok = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6Ik1UaEVOVUpHTkVNMVFURTRNMEZCTWpkQ05UZzVNRFUxUlRVd1FVSkRNRU13UmtGRVFrRXpSZyJ9.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL3Byb2ZpbGUiOnsiZW1haWwiOiJrMG50cmEua2Fta2FtQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJnZW9pcF9jb3VudHJ5IjoiTkwifSwiaHR0cHM6Ly9hcGkub3BlbmFpLmNvbS9hdXRoIjp7InVzZXJfaWQiOiJ1c2VyLU9aZGlxendLSVRuTHRpc1lmdnozTWo2YSJ9LCJpc3MiOiJodHRwczovL2F1dGgwLm9wZW5haS5jb20vIiwic3ViIjoiZ29vZ2xlLW9hdXRoMnwxMDgwMjMxNjU1ODU2NTI2MDY5ODgiLCJhdWQiOlsiaHR0cHM6Ly9hcGkub3BlbmFpLmNvbS92MSIsImh0dHBzOi8vb3BlbmFpLmF1dGgwLmNvbS91c2VyaW5mbyJdLCJpYXQiOjE2NzMzNDU0ODcsImV4cCI6MTY3Mzk1MDI4NywiYXpwIjoiVGRKSWNiZTE2V29USHROOTVueXl3aDVFNHlPbzZJdEciLCJzY29wZSI6Im9wZW5pZCBwcm9maWxlIGVtYWlsIG1vZGVsLnJlYWQgbW9kZWwucmVxdWVzdCBvcmdhbml6YXRpb24ucmVhZCBvZmZsaW5lX2FjY2VzcyJ9.r8N402-719CfYEIsLaFU6186Akcfh9d0VgH6TuYgQQHH0q_0bpEdC4zUT0PwHSAVTHnOFLgQnmUmARLQfMoCaX8wKS3V2Cw8dmm7s8KC4Rc-2kSjS16jEl3a39wyXAGT-yguip8moK_sbbL56uUihyRdqA4Cww12vXIJedLHRWd0xudRJOuDG-UKG2vL36hfnVTRRaxz-salAFUdhPzugANlNT2mIa0pT-aalFFDCIabfpMkCo-MV4kZPLs0_D3NQQ-bmFoKDxp3H_N7GnBqTQVldsnuvmHjItk8IVFZQk4jWo8gxn9q14BysFXWsb7_tvnOULGuAmxXQH_J5dDMSw'
-    response, conversation_id, parent_message_id = asking(conversation_id, parent_message_id, user_prompt,tok)
-    resp =  make_response(jsonify({'response': response, 'conversation_id': conversation_id, 'parent_message_id': parent_message_id}))
-    resp.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+
+    def asking(browser, conversation_id='', parent_message_id='', user_prompt='', token=''):
+        bot = ChatGPT(pw=browser)
+    
+        # TODO refresh session button --> bot.refresh_session
+
+        #asking for response:
+        print('~~~porside shod~~~')
+        
+        if conversation_id != '' and parent_message_id != '':
+            bot.conversation_id = conversation_id
+            bot.parent_message_id = parent_message_id
+        
+        if token =='':
+            response = bot.ask(user_prompt)
+        else: 
+            print(bot.session)
+            response = bot.ask(user_prompt, token)
+        conversation_id = bot.conversation_id
+
+            
+        #returning data back
+        print (response,bot.conversation_id, bot.parent_message_id)
+        return response,bot.conversation_id, bot.parent_message_id
+
+    tok = ''
+    response, conversation_id, parent_message_id = asking(browser, conversation_id, parent_message_id, user_prompt,tok)
+    # resp =  make_response(jsonify({'response': response, 'conversation_id': conversation_id, 'parent_message_id': parent_message_id}))
+    resp =  make_response(jsonify({'response': response}))
+
+    resp.headers['Access-Control-Allow-Origin'] = '*'
 
     print(resp)
     # Insert the new chat message into the database
@@ -177,5 +281,6 @@ def handle_request():
     return resp
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3002)
+    start_browser()
+    app.run(host='0.0.0.0', port=3002, threaded = False)
 

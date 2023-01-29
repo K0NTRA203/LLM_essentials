@@ -1,141 +1,236 @@
+import React, {useRef, useState, useEffect } from 'react';
+import {Checkbox, Modal, Layout, Menu, Input, Slider, Card, Button,Space,ConfigProvider,theme} from 'antd';
+import {
+  DeleteRowOutlined
+} from '@ant-design/icons';
+import { blue } from '@ant-design/colors';
 
-import React, {useRef, useState, useEffect} from 'react';
-import { Button, Modal,Input} from 'antd';
 
-const Form = (props) => {
-  const {conversationIdRef, parentMessageIdRef, userPromptRef, convNameRef, handleConversationNameChange, conversationName} = props;
-  const [conversationNames, setConversationNames] = useState([]);
-  const setConvName = useState([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const newConvRef = useRef();
+const { Content, Sider } = Layout;
+const { TextArea } = Input;
+const Form = () => {
+  const [history, setHistory] = useState('1');
+  const [result, setResult] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [names, setNames] = useState([]);
+  const [messages, setMessages] = useState([]);
+
+
   
-  const showModal = () => {
-    setIsModalOpen(true);
-   return (
-    <>
-      <Button type="primary" onClick={showModal}>
-        Open Modal
-      </Button>
-      <Modal title="Basic Modal" open={isModalOpen} onOk={handleOk} onCancel={handleCancel}>
-      
-      </Modal>
-    </>)};
-  const handleOk = () => {
-    handleDelete()
-    setIsModalOpen(false);
-  };
-  const handleCancel = () => {
-    setIsModalOpen(false);
-    setIsAddOpen(false)
-  };
+  const [name, setName] = useState('');
+  const [butt, setButt] = useState(false);
+  const cardRef = useRef();
+  // On component mount
+  useEffect(() => {
+    cardRef.current.scrollTo(0, cardRef.current.scrollHeight);
+  }, [messages])
 
-
+  const [modalVisible, setModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [loadingVisible, setLodalVisible] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:3002/names')
-      .then(response => response.json())
-      .then(data => {
-        setConversationNames(data.conversation_names);
-      });
-  }, []);
-
-  const handleFormSubmit = (event) => {
-    event.preventDefault();
-
-    // Get the values of the input elements
-    const conversationId = conversationIdRef.current.value;
-    const parentMessageId = parentMessageIdRef.current.value;
-    const userPrompt = userPromptRef.current.value;
-    const convName = convNameRef.current.value;
+    fetchMsgs();
+    fetchNames();
+  }, [name, history,result]);
+  const cards = messages.map(message => {
+    console.log('salam');
     
+    return (
+      <div>
+        <div>
+          <br></br>
+          <Card style={{fontFamily:'monospace', color:'white', backgroundColor: '#000032'}} >        
+            <div dangerouslySetInnerHTML={{__html: '🧠: ' + message.user_prompt.replace(/\n/g, '<br />')}} />
+          </Card>
 
-    // Send a POST request to the server with the input values as the request body
-    fetch('http://localhost:3002/chat', {
-      method: 'POST',
-      body: JSON.stringify({ conversation_id: conversationId, parent_message_id: parentMessageId, user_prompt: userPrompt,conversation_name:convName }),
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        // Update the parentMessageId field and the serverResponse element with the response from the server
-        parentMessageIdRef.current.value = data.parent_message_id;
-        conversationIdRef.current.value = data.conversation_id;
-        document.getElementById('serverResponse').innerHTML = data.response;
-      });
+          <Card style={{fontFamily:'monospace', color:'white', backgroundColor: '#000032'}} >        
+            <p>🤖</p>
+            <p>  <div dangerouslySetInnerHTML={{__html: message.response.replace(/\n/g, '<br />')}} /></p>
+          </Card>
+        </div>
+      </div>
+    );
+  });
+
+
+  const fetchMsgs = async () => {
+
+    try {
+      
+      if(!name || !history) return 
+      console.log(history)
+      const res = await fetch(`http://localhost:3002/gpt/messages?name=${name}&x=${history}`);
+      const data = await res.json();
+      setMessages(data.messages);
+      // setEngine(data.engines);
+      console.log(messages)
+    } catch (err) {
+      console.error(err);
+    }
+}
+
+
+  const fetchNames = async () => {
+    try {
+      const res = await fetch('http://localhost:3002/gpt/names');
+      
+      const data = await res.json();
+      console.log(data.name)
+      setNames(data.name);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  const handleDeleteName = async () => {
+    try {
+      fetch('http://localhost:3002/gpt/names', {
+        method: 'DELETE',
+        body: JSON.stringify({ conv_name: name }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      //Refetch the names after deletion
+      fetchNames();
+      handleDeleteModalCancel();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  
+
+  const handleNewChatClick = () => {
+    setModalVisible(true);
+  };
+  const handleModalConfirm = () => {
+    setModalVisible(false);
+  };
+  const handleModalCancel = () => {
+    setModalVisible(false);
+  };
+  const handleDeleteModalCancel = () => {
+    setDeleteModalVisible(false);
+  };
+
+  
+  const handleNameChange = e => {
+    setName(e.target.value);
   };
   
-  const handleConfirm = () => {
-    setIsModalOpen(false);
-    
-  };
-  
-  const handleAdd = () => {
-    setIsAddOpen(true);
-  };
-  const addConfirm = () => {
-  
-    setIsAddOpen(false);
-  };
-  
-  const handleDelete = (event) => {
-    event.preventDefault();
 
-    // Get the value of the selected conversation name
-    const convName = convNameRef.current.value;
+  const handleSubmit = async e => {
+    e.preventDefault();
+    setButt(true);
+    setPrompt('');
+    setLodalVisible(true)
 
-    // Send a DELETE request to the server with the selected conversation name as the request body
-    fetch('http://localhost:3002/chat', {
-      method: 'DELETE',
-      body: JSON.stringify({ conversation_name: convName }),
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        // Update the conversationNames list with the response from the server
-        setConversationNames(data.conversation_names);
-      });
-  };
+    try {
+      
+      const res = await fetch('http://localhost:3002/gpt', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name,
+          prompt: prompt,
 
-return (
-<div>
-      <form onSubmit={handleFormSubmit}>
-        <label htmlFor="convName">Conversation Name:</label>
-        <br />
-        <select id="convName" ref={convNameRef} value={conversationName} onChange={handleConversationNameChange}>
-          {conversationNames.map(name => (
-            <option>{name}</option>
-          ))}
-        </select>
-        {isModalOpen ? (
-          <>
-            
-          </>
-        ) : (
-          <>
-   
-            <button type="button" onClick={showModal}>-</button>
-            <button type="button" onClick={handleAdd}>+</button>
-          </>
-        )}
-        <br />
-        <label htmlFor="userPrompt">User Prompt:</label>
-        <br />
-        <textarea id="userPrompt" style={{ width: '80%', height: '100px' ,left: '50%'}} ref={userPromptRef} />
+        }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }).then(() => {
+        setLodalVisible(false);
+        fetchMsgs();
+        setPrompt('');
+        setButt(false);
+        fetchNames();
         
-        <Button size='small' shape='circle' onClick={handleFormSubmit}>👀</Button>
-        <br />
-        <input type="text" id="conversationId" ref={conversationIdRef} disabled/>
-        <br />
-        <input type="text" id="parentMessageId" ref={parentMessageIdRef} disabled/>
-        <br />
-        <Modal title={`Confirm Deleting Conversation ${conversationName}`} open={isModalOpen} onOk={handleDelete} onCancel={handleCancel}>
-          <p></p>
-        </Modal>
-        <Modal title='New Chat' open={isAddOpen} onOk={addConfirm} onCancel={handleCancel}>
-          <input type="text" id="convName" ref={convNameRef} value={conversationName} onChange={handleConversationNameChange} />
-        </Modal>
-      </form>
-    </div>
-  );};
-  export default Form;
+     });
+      const data = await res.json();
+      setResult(data.result);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+return (
+  <ConfigProvider
+  style={{fontFamily:'monospace'}}
+  theme={{
+    algorithm: theme.darkAlgorithm,
+    token: {
+      colorPrimary: '#0203CD'
+      
+      
+    },
+  }}
+  >
+    <Layout style={{fontFamily:'monospace'}}>
+      
+<Sider style={{fontWeight: 700, marginRight: '20px', marginBottom: '20px'}}>
+<Menu style={{fontFamily:'monospace'}}>
+    <Menu.Item key="1" onClick={handleNewChatClick}>New Chat</Menu.Item>
+    {names.map(name => (
+      <Menu.Item key={name} onClick={() => {setName(name); fetchMsgs()}} style={{display: 'flex', alignItems: 'center'}}>
+          <span style={{flex: 1, textAlign: 'left'}}>{name + '    '}</span>
+          <DeleteRowOutlined onClick={() => setDeleteModalVisible(true)} style={{cursor: 'pointer',flex: 1, textAlign: 'right'}}/>
+      </Menu.Item>
+    ))}
+</Menu>
+
+  <label>
+            History:
+            <Input
+              type="number"
+              value={history}
+              onChange={e => {setHistory(e.target.value); fetchMsgs()}}
+              min={1}
+              max={10}
+          />
+          </label>
+
+</Sider>
+<Modal
+  title={`YOU ARE DELETING ${name}`}  
+  open={deleteModalVisible}
+  onOk={handleDeleteName}
+  onCancel={handleDeleteModalCancel}>
+    <Input value={name} onChange={handleNameChange} />
+</Modal>
+<Modal
+  title="Enter a name"
+  open={modalVisible}
+  onOk={handleModalConfirm}
+  onCancel={handleModalCancel}>
+    <Input value={name} onChange={handleNameChange} />
+</Modal>
+
+
+<Content style={{fontFamily:'monospace', marginRight:20}}>
+  <form onSubmit={handleSubmit}>
+    <Space direction="vertical" size="small" style={{ display: 'flex' }}>
+      <Card ref={cardRef} title={name} value={result} style={{display: 'list-item' ,backgroundColor: '#000032', height: '400px', overflow: 'auto', marginBottom:'50px' ,fontFamily:'monospace' }}>
+        {cards}
+        {loadingVisible && (
+        <img
+          src= "loading.gif"
+          style={{ width: '70%', height: '70%',display: 'block', margin: '0 auto', marginTop: '20'}}
+          alt="loading"
+        />)}
+      </Card> 
+        <div> 
+          <Card >
+ 
+            <TextArea value={prompt} showCount maxLength={100000} 
+            onChange={e => setPrompt(e.target.value)}  
+            onKeyPress={e => {if (e.key === 'Enter') handleSubmit(e);}} /> 
+          <Button disabled={butt} type="primary" htmlType="submit">Send</Button>
+      </Card> 
+        </div> 
+    </Space> 
+  </form>
+</Content>
+
+          <br />
+    </Layout>
+    </ConfigProvider>
+  );
+};
+export default Form;

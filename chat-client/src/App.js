@@ -4,7 +4,7 @@ import Porm from './Form';
 import ServerResponse from './ServerResponse';
 import { useHandleConversationNameChange } from './handleConversationNameChange';
 import Playground from './Playground';
-import { Button,Layout} from 'antd';
+import { Button,Layout,ConfigProvider} from 'antd';
 import { Content, Footer } from 'antd/es/layout/layout';
 
 const App = () => {
@@ -24,13 +24,21 @@ const App = () => {
   };
 
   return (
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: '#00b96b',
+        },
+      }}
+      >
     <Layout>
-      <Content>
+      
+      <Content style={{backgroundColor: '#000032', marginBottom: '20px'}}>
     <div >
       <div>
         {page === 'conversation' && (
           <>
-            <ServerResponse />
+            
             <Porm
               conversationIdRef={conversationIdRef}
               parentMessageIdRef={parentMessageIdRef}
@@ -45,8 +53,10 @@ const App = () => {
       </div>
     </div>
     <Layout>
-    <Footer>
     {page === 'playground' && <Playground />}
+    <Footer style={{backgroundColor: '#e8dcec', marginUp: '20px'}}>
+    
+    
         <Button onClick={() => handlePageChange('conversation')}>Chat page</Button>
         <Button onClick={() => handlePageChange('playground')}>Playground page</Button>
         
@@ -54,6 +64,7 @@ const App = () => {
     </Layout>
     </Content>
     </Layout>
+    </ConfigProvider>
     
   );
 };
