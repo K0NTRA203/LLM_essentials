@@ -1,9 +1,10 @@
-import React, {useRef, useState, useEffect } from 'react';
-import {Checkbox, Modal, Layout, Menu, Input, Slider, Card, Button,Space} from 'antd';
+import React, { useRef, useState, useEffect,useLayoutEffect} from 'react';
+import { Checkbox, Form, Modal, Layout, Menu, Input, Slider, Card, Button, Space, ConfigProvider,theme } from 'antd';
 import {
   DeleteRowOutlined
 } from '@ant-design/icons';
-
+// import { io } from "https://cdn.socket.io/4.3.2/socket.io.esm.min.js";
+import io from 'socket.io-client';
 const { Content, Sider } = Layout;
 const { TextArea } = Input;
 const Playground = () => {
@@ -18,85 +19,120 @@ const Playground = () => {
   const [names, setNames] = useState([]);
   const [messages, setMessages] = useState([]);
   const [tick, setTick] = useState(false);
-
-  
-  
-  
+  const [removeLast, setRemoveLast] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState('');
+  const [start, setStart] = useState('');
   const [butt, setButt] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [isRendered, setIsRendered] = useState(false);
   const cardRef = useRef();
-  // On component mount
-  useEffect(() => {
+  const [socket, setSocket] = useState(null);
+
+
+   // On component mount
+   useEffect(() => {
+    const socket = io('http://localhost:3002');
+    setSocket(socket);
+    setStart('started');
+    console.log('PG Connected to the server!');
+    
+  
+    socket.on("disconnect", () => {
+      console.log("PG Disconnected");
+    });
+  
+    return () => {
+      socket.off("connect");
+      socket.off("disconnect");
+    };
+  }, []);
+
+  useLayoutEffect(() => {
     cardRef.current.scrollTo(0, cardRef.current.scrollHeight);
   }, [messages])
 
-  const [modalVisible, setModalVisible] = useState(false);
+
+  function TypewriterText({ text, setIsRendered, cardRef }) {
+    const [currentText, setCurrentText] = useState("");
+    let i = 0;
+    const randomTime = Math.floor(Math.random() * (80 - 10 + 1) + 10);
+    useEffect(() => {
+      let modifiedText = text.replace(/\n/g, "\n\r");
+      modifiedText = modifiedText.replace(/\r/g, "<br />");
   
+      const interval = setInterval(() => {
+        setCurrentText(modifiedText.slice(0, i));
+        i++;
+        cardRef.current.scrollTo(0, cardRef.current.scrollHeight);
+        if (i > modifiedText.length) {
+          clearInterval(interval);
+          socket.emit("playground_messages", { name, history });
+          setIsRendered(true);
+          setPrompt('');
+
+        }
+      }, randomTime);
+      return () => clearInterval(interval);
+    }, [text]);
+    return <p dangerouslySetInnerHTML={{ __html: currentText}} />;
+  }
+
+
   useEffect(() => {
-    // fetchMsgs();
-    fetchNames();
-  }, [name, history,result]);
+    if (socket) {
+    socket.emit("playground_messages", { name, history });
+    console.log('requesting msgs')}
+  }, [name, history]);
+  if (socket) {
+  socket.on("messages", data => {
+    console.log('messages came')
+    setMessages(data.messages);
+    setResult('');
+    console.log(data)
+  })};
+
+
+  useEffect(() => {
+    if (socket) {
+    socket.emit("playground_names");
+    console.log('asking names');}
+  }, [name, start]);
+  if (socket) {
+  socket.on("conversation_names", data => {
+    console.log('names came')
+    setNames(data.name);
+    console.log(data)
+  })};
+
+
   const cards = messages.map(message => {
-    console.log('salam');
-    
     return (
-      <div>
         <div>
           <br></br>
-          <Card style={{backgroundColor: '#c9f0ef'}}>
-            
-            <p>🧠: {message.prompt} </p>
+          <Card style={{backgroundColor:'#1a0000', fontFamily: 'monospace'}}>
+            <div dangerouslySetInnerHTML={{ __html: '🧠: ' + message.prompt.replace(/\n/g, '<br />') }} />
           </Card>
-          
-          <Card style={{backgroundColor: '#fbffba'}}>
-            <p>🤖: {message.best_choice_text}</p>
 
+          <Card style={{backgroundColor:'black', fontFamily: 'monospace'}}>
+            <div dangerouslySetInnerHTML={{ __html: '🤖: ' + '<br />' + message.best_choice_text.replace(/\n/g, '<br />') }} />
           </Card>
         </div>
-      </div>
     );
   });
-  const fetchMsgs = async () => {
 
+
+  const handleDeleteName = async () => {
     try {
-      
-      if(!name || !history) return 
-      console.log(history)
-      const res = await fetch(`http://localhost:3002/playground/messages?name=${name}&x=${history}`);
-      const data = await res.json();
-      setMessages(data.messages);
-      // setEngine(data.engines);
-      console.log(messages)
+      socket.emit('deleteName', { name: name });
+      handleDeleteModalCancel();
     } catch (err) {
       console.error(err);
     }
-}
-
-
-  const fetchNames = async () => {
-    try {
-      const res = await fetch('http://localhost:3002/playground/names');
-      
-      const data = await res.json();
-      console.log(data.name)
-      setNames(data.name);
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  const handleDeleteName = async (name) => {
-    try {
-      await fetch(`http://localhost:3002/playground/names?name=${name}`, {
-        method: 'DELETE'
-      });
-      //Refetch the names after deletion
-      fetchNames();
-    } catch (err) {
-      console.error(err);
-    }
-  }
+  };
   
+
 
   const handleNewChatClick = () => {
     setModalVisible(true);
@@ -107,87 +143,118 @@ const Playground = () => {
   const handleModalCancel = () => {
     setModalVisible(false);
   };
-  
+
   const handleNameChange = e => {
     setName(e.target.value);
   };
-  
+  const handleDeleteModalCancel = () => {
+    setDeleteModalVisible(false);
+  };
+
 
   const handleSubmit = async e => {
     e.preventDefault();
+    setIsLoading(true);
     setButt(true);
-    
-    try {
-      
-      const res = await fetch('http://localhost:3002/playground', {
-        method: 'POST',
-        body: JSON.stringify({
-          name,
-          engine,
-          prompt,
-          maxTokens,
-          n,
-          stop,
-          temp,
-          tick
-         
-        }),
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }).then(() => {
-        fetchMsgs();
-        setPrompt('');
-        setButt(false);
-        fetchNames();
-     });
-      const data = await res.json();
+    setIsRendered(false);
+    socket.emit("playground", {
+      'name':name,
+      'engine':engine,
+      'prompt':prompt,
+      'maxTokens':maxTokens,
+      'n':n,
+      'stop':stop,
+      'temp':temp,
+      'tick':tick
+    });
+  
+    socket.on("response", data => {
+      setIsLoading(false);
       setResult(data.result);
-    } catch (err) {
-      console.error(err);
-    }
+      console.log(data.result);
+      setButt(false);
+        });
   };
-return (
+  return (
+    <ConfigProvider
+    style={{fontFamily:'monospace'}}
+    theme={{
+      algorithm: theme.darkAlgorithm,
+      token: {
+        colorPrimary: '#CD0203'
+        
+        
+      },
+    }}
+    >
     <Layout>
-      
-<Sider theme='light' style={{backgroundColor: '#e8dcec', marginRight: '20px', marginBottom: '20px'}}>
-  <Menu style={{backgroundColor: '#d4d4d4'}}>
-    <Menu.Item key="1" onClick={handleNewChatClick}>New Chat</Menu.Item>
-    {names.map(name => (
-      <Menu.Item key={name} onClick={() => {setName(name); fetchMsgs()}} style={{display: 'flex', justifyContent: 'space-between'}}>
-          {name}
-          <DeleteRowOutlined onClick={() => handleDeleteName(name) } style={{float:'right'}}/>
-      </Menu.Item>
-      ))}
-  </Menu>
-</Sider>
 
-<Modal
-  title="Enter a name"
-  open={modalVisible}
-  onOk={handleModalConfirm}
-  onCancel={handleModalCancel}>
-    <Input value={name} onChange={handleNameChange} />
-</Modal>
+      <Sider style={{ backgroundColor:'black', marginRight: '20px', marginBottom: '20px' }}>
+        <Menu style={{backgroundColor:'black', fontFamily:'monospace', fontWeight: 700}}>
 
-<Space direction="vertical"></Space>    
-<Content style={{backgroundColor: '#d4d4d4'}}>
-  <form onSubmit={handleSubmit}>
+        <img
+            src= "https://web.archive.org/web/20090903074751im_/http://geocities.com/Area51/Corridor/4492/scale.gif"
+            style={{ width: '30%', height: '30%',display: 'block', margin: '0 auto', marginTop: '20px', marginBottom: '20px'}}
+            
+          /><br/><br/>
+          <Menu.Item key="1" onClick={handleNewChatClick}>New Chat</Menu.Item>
+          {names.map(name => (
+            <Menu.Item key={name} onClick={() => {setName(name)}} style={{display: 'flex', alignItems: 'center'}}>
+              <span style={{flex: 1, textAlign: 'left'}}>{name + '    '}</span>
+              <DeleteRowOutlined onClick={() => setDeleteModalVisible(true)} style={{cursor: 'pointer',flex: 1, textAlign: 'right'}}/>
+            </Menu.Item>
+          ))}
+        </Menu>
+      </Sider>
+      <Modal style={{fontFamily:'monospace'}}
+        title={`YOU ARE DELETING ${name}`}  
+        open={deleteModalVisible}
+        onOk={handleDeleteName}
+        onCancel={handleDeleteModalCancel}>
+          
+      </Modal>
+      <Modal style={{fontFamily:'monospace'}}
+        title="Enter a name"
+        open={modalVisible}
+        onOk={handleModalConfirm}
+        onCancel={handleModalCancel}>
+        <Input value={name} onChange={handleNameChange} />
+      </Modal>
+
+      <Space direction="vertical"></Space>
+<Content style={{ fontFamily: 'monospace'}}>
+  <Form onSubmit={handleSubmit}>
     <Space direction="vertical" size="large" style={{ display: 'flex' }}>
-      <Card ref={cardRef} title={name} value={result} style={{ height: '90%', overflow: 'auto' }}> {cards} </Card> 
-        <div> 
-          <Card style={{backgroundColor: '#f0ecec'}}>
-          <TextArea value={prompt} showCount maxLength={100000} 
-            onChange={e => setPrompt(e.target.value)}  
-            onKeyPress={e => {if (e.key === 'Enter') handleSubmit(e);}} /> 
-            <br /> <br /> 
-          <Button disabled={butt} type="primary" htmlType="submit">Send</Button>
-      </Card> 
-        </div> 
-    </Space> 
-  </form>
+      <Card ref={cardRef} title={name} style={{fontFamily: 'monospace', height: 'calc(100vh * 0.66)', overflow: 'auto', maxHeight: 'calc(100vh * 0.66)', overflowY: 'scroll' }}>
+        {cards}
+
+        {result && !isRendered && (
+          <div>
+            <br />
+            <Card style={{backgroundColor:'#1a0000',fontFamily: 'monospace'}}>
+              🧠: {prompt}
+            </Card>
+            <Card style={{backgroundColor:'black', fontFamily: 'monospace'}}>
+              🤖:<TypewriterText text={result} setIsRendered={setIsRendered} cardRef={cardRef} />
+            </Card>
+          </div>
+        )}
+      </Card>
+
+      <div>
+        <Card style={{ height: 'calc(100vh * 0.3)' }}>
+          <TextArea style={{height: 'calc(100vh * 0.15)', backgroundColor:'black'}} value={prompt} showCount maxLength={100000}
+            onChange={e => setPrompt(e.target.value)}
+            onKeyPress={e => { if (e.key === 'Enter') handleSubmit(e); }} />
+          <br/>
+          <Button onClick={handleSubmit} style={{height: 'calc(100vh * 0.05)', minHeight: '20px'}} loading={isLoading} disabled={butt} type="primary" htmlType="submit">Send</Button>
+        </Card>
+      </div>
+    </Space>
+  </Form>
 </Content>
-        <Sider style={{backgroundColor: '#e8dcec', marginLeft: '20px'}}>
+
+      <Sider style={{backgroundColor:'black',  marginLeft: '20px' }}>
         <form onSubmit={handleSubmit}>
           <label>
             Engine:
@@ -230,7 +297,7 @@ return (
           <br />
           <label>
             Temperature:
-            <Slider style={{backgroundColor: '#e8dcec'}}
+            <Slider
               value={temp}
               onChange={setTemp}
               min={0}
@@ -244,15 +311,15 @@ return (
             <Input
               type="number"
               value={history}
-              onChange={e => {setHistory(e.target.value); fetchMsgs()}}
+              onChange={e => { setHistory(e.target.value) }}
               min={1}
               max={10}
-          />
+            />
           </label>
           <br />
         </form>
       </Sider>
-    </Layout>
+    </Layout></ConfigProvider>
   );
 };
 export default Playground;
