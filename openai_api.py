@@ -36,6 +36,7 @@ def playground(name, engine, prompt, max_tokens, n, stop, temperature,tick=False
     print('prompt', prompt)
     print('engine', engine)
     openai.api_key = "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"
+    print('api: ', openai.api_key)
     response = openai.Completion.create(
         engine=engine,
         prompt=prompt,
@@ -44,6 +45,7 @@ def playground(name, engine, prompt, max_tokens, n, stop, temperature,tick=False
         stop=stop,
         temperature=temperature
     )
+    print(response)
     def response_to_db(name, response, engine, prompt):
         conn = sqlite3.connect('database.db')
         c = conn.cursor()

@@ -3,8 +3,7 @@ import { Checkbox, Form, Modal, Layout, Menu, Input, Slider, Card, Button, Space
 import {
   DeleteRowOutlined
 } from '@ant-design/icons';
-// import { io } from "https://cdn.socket.io/4.3.2/socket.io.esm.min.js";
-import io from 'socket.io-client';
+
 const { Content, Sider } = Layout;
 const { TextArea } = Input;
 const Playground = () => {
@@ -22,37 +21,19 @@ const Playground = () => {
   const [removeLast, setRemoveLast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState('');
-  const [start, setStart] = useState('');
   const [butt, setButt] = useState(false);
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [isRendered, setIsRendered] = useState(false);
   const cardRef = useRef();
-  const [socket, setSocket] = useState(null);
 
 
-   // On component mount
-   useEffect(() => {
-    const socket = io('http://localhost:3002');
-    setSocket(socket);
-    setStart('started');
-    console.log('PG Connected to the server!');
-    
-  
-    socket.on("disconnect", () => {
-      console.log("PG Disconnected");
-    });
-  
-    return () => {
-      socket.off("connect");
-      socket.off("disconnect");
-    };
-  }, []);
+  // On component mount
 
   useLayoutEffect(() => {
     cardRef.current.scrollTo(0, cardRef.current.scrollHeight);
   }, [messages])
 
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [isRendered, setIsRendered] = useState(false);
 
   function TypewriterText({ text, setIsRendered, cardRef }) {
     const [currentText, setCurrentText] = useState("");
@@ -68,8 +49,8 @@ const Playground = () => {
         cardRef.current.scrollTo(0, cardRef.current.scrollHeight);
         if (i > modifiedText.length) {
           clearInterval(interval);
-          socket.emit("playground_messages", { name, history });
           setIsRendered(true);
+          fetchMsgs();
           setPrompt('');
 
         }
@@ -79,58 +60,79 @@ const Playground = () => {
     return <p dangerouslySetInnerHTML={{ __html: currentText}} />;
   }
 
-
   useEffect(() => {
-    if (socket) {
-    socket.emit("playground_messages", { name, history });
-    console.log('requesting msgs')}
+    fetchMsgs();
+    fetchNames();
   }, [name, history]);
-  if (socket) {
-  socket.on("messages", data => {
-    console.log('messages came')
-    setMessages(data.messages);
-    setResult('');
-    console.log(data)
-  })};
-
-
-  useEffect(() => {
-    if (socket) {
-    socket.emit("playground_names");
-    console.log('asking names');}
-  }, [name, start]);
-  if (socket) {
-  socket.on("conversation_names", data => {
-    console.log('names came')
-    setNames(data.name);
-    console.log(data)
-  })};
-
-
   const cards = messages.map(message => {
+
     return (
+  
         <div>
           <br></br>
           <Card style={{backgroundColor:'#1a0000', fontFamily: 'monospace'}}>
+
             <div dangerouslySetInnerHTML={{ __html: '🧠: ' + message.prompt.replace(/\n/g, '<br />') }} />
           </Card>
 
           <Card style={{backgroundColor:'black', fontFamily: 'monospace'}}>
             <div dangerouslySetInnerHTML={{ __html: '🤖: ' + '<br />' + message.best_choice_text.replace(/\n/g, '<br />') }} />
+
+
+
+
           </Card>
         </div>
+    
     );
   });
-
-
-  const handleDeleteName = async () => {
+  const fetchMsgs = async (removeLast = false) => {
     try {
-      socket.emit('deleteName', { name: name });
-      handleDeleteModalCancel();
+      if (!name || !history) return;
+      console.log(history);
+      const res = await fetch(`http://localhost:3002/playground/messages?name=${name}&x=${history}`);
+      const data = await res.json();
+      if (removeLast) {
+        setMessages(data.messages.slice(0, -1));
+      } else {
+        setMessages(data.messages);
+        setResult('')
+      }
+      console.log(messages);
     } catch (err) {
       console.error(err);
     }
   };
+
+
+
+  const fetchNames = async () => {
+    try {
+      const res = await fetch('http://localhost:3002/playground/names');
+
+      const data = await res.json();
+      console.log(data.name)
+      setNames(data.name);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  const handleDeleteName = async () => {
+    try {
+      fetch('http://localhost:3002/playground/names', {
+        method: 'DELETE',
+        body: JSON.stringify({ name: name }),
+        headers: { 'Content-Type': 'application/json' },
+      }).then(() => {
+       
+      //Refetch the names after deletion
+        fetchNames();
+        handleDeleteModalCancel()});
+    } catch (err) {
+      console.error(err);
+    }
+  }
   
 
 
@@ -154,26 +156,37 @@ const Playground = () => {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    setIsLoading(true);
+    setIsLoading(true)
     setButt(true);
     setIsRendered(false);
-    socket.emit("playground", {
-      'name':name,
-      'engine':engine,
-      'prompt':prompt,
-      'maxTokens':maxTokens,
-      'n':n,
-      'stop':stop,
-      'temp':temp,
-      'tick':tick
-    });
-  
-    socket.on("response", data => {
-      setIsLoading(false);
+    try {
+      const res = await fetch('http://localhost:3002/playground', {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          engine,
+          prompt,
+          maxTokens,
+          n,
+          stop,
+          temp,
+          tick
+
+        }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      setIsLoading(false)
       setResult(data.result);
       console.log(data.result);
+      fetchMsgs(true);
       setButt(false);
-        });
+      fetchNames();
+    } catch (err) {
+      console.error(err);
+    }
   };
   return (
     <ConfigProvider
@@ -199,7 +212,7 @@ const Playground = () => {
           /><br/><br/>
           <Menu.Item key="1" onClick={handleNewChatClick}>New Chat</Menu.Item>
           {names.map(name => (
-            <Menu.Item key={name} onClick={() => {setName(name)}} style={{display: 'flex', alignItems: 'center'}}>
+            <Menu.Item key={name} onClick={() => {setName(name); fetchMsgs()}} style={{display: 'flex', alignItems: 'center'}}>
               <span style={{flex: 1, textAlign: 'left'}}>{name + '    '}</span>
               <DeleteRowOutlined onClick={() => setDeleteModalVisible(true)} style={{cursor: 'pointer',flex: 1, textAlign: 'right'}}/>
             </Menu.Item>
@@ -311,7 +324,7 @@ const Playground = () => {
             <Input
               type="number"
               value={history}
-              onChange={e => { setHistory(e.target.value) }}
+              onChange={e => { setHistory(e.target.value); fetchMsgs() }}
               min={1}
               max={10}
             />

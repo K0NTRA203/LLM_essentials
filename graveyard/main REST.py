@@ -31,29 +31,29 @@ making embedded models to load in pg
 """
 from lib.chatgpt_wrapper import ChatGPT
 from openai_api import playground
-import operator
-from functools import reduce
+import os
+import jsonlines
+import json
 import subprocess
 import sqlite3
+import numpy as np
+import time
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 import subprocess
 from playwright.sync_api import sync_playwright
 import json
 import embedding, embed
-# from flask_socketio import SocketIO, emit
+import threading
 from embedding import import_knowledge, vectorize_knowledge, response_to_db, check_language, translate_prompt
 # doc = import_knowledge('knowledge/civil_code')
 # vectorize_knowledge(doc,'knowledge/civil_code.json')
-import eventlet.wsgi
-import socketio
-from eventlet.green import threading
+
 
 def start_browser(method = 'start'):
 
     global browser
     if method == 'start':
-        subprocess.run("pkill -f playwright", shell=True)
         playwright = sync_playwright().start()
         browser = playwright.firefox.launch_persistent_context(
             user_data_dir="/tmp/playwright",
@@ -71,32 +71,17 @@ def start_browser(method = 'start'):
             user_data_dir="/tmp/playwright",
             headless=True)
         browser.pages[0].goto("https://chat.openai.com/")
-    elif method == 'login':
-        print('************************LOGIN PLAYWRIGHT')
-        for page in browser.pages:
-            page.close()
-        subprocess.run("pkill -f playwright", shell=True)
-        playwright = sync_playwright().start()
-        browser = playwright.firefox.launch_persistent_context(
-            user_data_dir="/tmp/playwright",
-            headless=False)
-        browser.pages[0].goto("https://chat.openai.com/")
+        print('************************PLAYWRIGHT READY')
 
-sio = socketio.Server(cors_allowed_origins="http://localhost:3000")
-app = socketio.WSGIApp(sio)
-
-@sio.event  
-def connect(sid, environ):
-    print('[INFO] Connect to client', sid)
     
-@sio.on('disconnect')
-def handle_disconnect(sid):
-    print('disconnect ', sid)
-    
+app = Flask(__name__)       
+CORS(app)
 
 
-@sio.on('playground')   
-def playground_route(sid, data):
+
+@app.route('/playground' , methods=['POST'])
+def playground_route():
+    data = request.get_json()
     name = data["name"]
     engine = data["engine"]
     prompt = data["prompt"]
@@ -131,12 +116,17 @@ def playground_route(sid, data):
         print('TRANSLATED RESPONSE: ', translated_response)
         response_to_db(name,translated_response, engine, prompt, tokens=tokens)
 
-    sio.emit('response',{'result':response}, room=sid)
+        
+    resp =  make_response(jsonify({"result": response}))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'POST'
+    return resp
 
-@sio.on('playground_messages')
-def playground_messages(sid, data):
-    name = data.get('name')
-    x = data.get('history')
+@app.route('/playground/messages' , methods=['GET'])
+def playground_messages():
+    name = request.args.get('name')
+    x = request.args.get('x')
+    print('NAME O X: ',name,x)
     #open connection to database
     db = sqlite3.connect('database.db')
     cursor = db.cursor()
@@ -145,15 +135,20 @@ def playground_messages(sid, data):
         cursor.execute("SELECT prompt, best_choice_text FROM playground WHERE name = ? ORDER BY time DESC LIMIT ?", (name, x))
 
     res = cursor.fetchall()
-    messages = []
+    conversation_messages = []
     for row in res:
-        messages.insert(0, {"prompt": row[0], "best_choice_text": row[1]})  
+        conversation_messages.insert(0, {"prompt": row[0], "best_choice_text": row[1]})  
           # close connection to database
     db.close()
-    sio.emit('messages', {'messages': messages}, room=sid)
+    #return conversation_messages to client
+    print(conversation_messages)
+    resp =  make_response(jsonify({"messages": conversation_messages}))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET'
+    return resp
 
-@sio.on('playground_names')
-def playground_names(sid):
+@app.route('/playground/names' , methods=['GET'])
+def playground_names():
     
     #open connection to database
     db = sqlite3.connect('database.db')
@@ -168,43 +163,37 @@ def playground_names(sid):
     # close connection to database
     db.close()
     #return conversation_names to client
-    sio.emit("conversation_names", {"name": conversation_names}, room=sid)
+    resp =  make_response(jsonify({"name": conversation_names}))
+    print('resp',resp)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET'
+    return resp
 
-@sio.on('delete_names')
-def delete_names(sid, data):   
+@app.route('/playground/names/', methods=['DELETE'])
+def delete_names():   
+    data = request.get_json()
     name = data['name']
-    print('deleting', name)
+    print('deletiiiiing', name)
     db = sqlite3.connect('database.db')
     cursor = db.cursor()
     cursor.execute("DELETE FROM playground WHERE name=?", (name,))
     db.commit()
     db.close()
-    sio.emit("delete_names", {"message": f"Successfully deleted all messages with name {name}"}, room=sid)
+    resp = jsonify({"message": f"Successfully deleted all messages with name {name}"})
 
-@sio.on('new_gpt_name')
-def new_name(sid, data):
-    name = data['name']
-    conversation_id = data['conversation_id']
-    parent_message_id = data['parent_id']
-    print('new name', name, conversation_id, parent_message_id)
-    db = sqlite3.connect('database.db')
-    cursor = db.cursor()
-    insert_sql = 'INSERT INTO chat_messages (conversation_name, conversation_id, parent_message_id, user_prompt, response) VALUES (?, ?, ?, ?, ?)'
-    cursor.execute(insert_sql, (name, conversation_id, parent_message_id, '', ''))
-    print('**************************name submitted*****************************************************')
-    db.commit()
-    db.close()
-    sio.emit("new_name_created", {"message": f"Successfully Created {name}, {conversation_id}, {parent_message_id}"}, room=sid)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'DELETE'
 
-    return
+    return resp
 
-@sio.on('gpt_names')
-def get_conversation_names(sid):
+@app.route('/gpt/names/', methods=['GET'])
+def get_conversation_names():
+
     #open connection to database
     db = sqlite3.connect('database.db')
     #set up a cursor to iterate over the database
     cursor = db.cursor()
-    #get conversation_names from databasez
+    #get conversation_names from database
     cursor.execute("SELECT DISTINCT conversation_name FROM chat_messages ORDER BY ROWID DESC")
     res = cursor.fetchall()
     conversation_names = []
@@ -213,99 +202,100 @@ def get_conversation_names(sid):
     #close connection to database
     db.close()
     #return conversation_names to client
-    sio.emit("conversation_names", {"name": conversation_names}, room=sid)
-    
+    resp =  make_response(jsonify({'name': conversation_names}))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET'
+    return resp
 
-@sio.on('delete_gpt_name')
-def delete_conversation(sid, data):
-    conversation_name = data['name']
+@app.route('/gpt/names', methods=['DELETE'])
+def delete_conversation():
+    data = request.get_json()
+    conversation_name = data['conv_name']
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
     c.execute("DELETE FROM chat_messages WHERE conversation_name=?", (conversation_name,))
     conn.commit()
+    # c.execute("SELECT DISTINCT conversation_name FROM chat_messages GROUP BY conversation_name")
+    # conversation_names = c.fetchall()
     conn.close()
-    print('successfully deleted')
-    sio.emit("delete_names", {"message": f"Successfully deleted all messages with name {conversation_name}"}, room=sid)
-    return
+    resp = jsonify({"message": f"Successfully deleted all messages with name {conversation_name}"})
 
-@sio.on('gpt')
-def handle_message(sid, data):
-    # Wrap the handle_message function in a green thread
-    t = threading.Thread(target=handle_message_thread, args=(sid, data))
-    t.start()
-def handle_message_thread(sid, data):
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET'
+
+    return resp
+
+@app.route('/gpt', methods=['POST'])
+def handle_request():
     global browser
-    # conversation_id = data ['conversation_id']
-    conversation_id = ''
-    parent_message_id = ''
+    conversation_id= ''
+    parent_message_id=''
+    # Get the conversation_id, parent_message_id, and user_prompt from the request body
+    data = request.get_json()
+    print('~~~data oomad~~~',data)
     user_prompt = data['prompt']
     conversation_name = data['name']
-    print(data)
-    print('SQL QONCECTED')
-    print('DATA OOMADDDDDD', user_prompt, conversation_name)
+    # Open a connection to the database
     db = sqlite3.connect('database.db')
     cursor = db.cursor()
     cursor.execute("SELECT conversation_id, parent_message_id FROM chat_messages WHERE conversation_name=? ORDER BY ROWID DESC LIMIT 1", (conversation_name,))
+    #TODO Multi-Threading conversations using this line:
+    # cursor.execute("SELECT conversation_id, parent_message_id FROM chat_messages WHERE conversation_name=? ORDER BY conversation_id DESC LIMIT 1", (conversation_name,))
     res = cursor.fetchone()
-    if res != None and res != ('', ''):
-        print('********************CONVERSATION EXISTS***********************'      )
-        print(res)
-        # if parent_message_id != '' and conversation_id != '':
+    if res != None:
+        print('CONVERSATION EXISTS')
+        # If conversation_name exists, set conversation_id and parent_message_id
         conversation_id = res[0]
-        parent_message_id = res[1]  
+        parent_message_id = res[1]
+        print('EXISTING CONVERSATION:', conversation_id,parent_message_id)
 
-    def asking(browser, conversation_id='', parent_message_id='', user_prompt='', token='' ):
+    def asking(browser, conversation_id='', parent_message_id='', user_prompt='', token=''):
         bot = ChatGPT(pw=browser)
-        print('****BOT INITIALIZED****')
+    
+        # TODO refresh session button --> bot.refresh_session
+
+        #asking for response:
+        print('~~~porside shod~~~')
+        
         if conversation_id != '' and parent_message_id != '':
             bot.conversation_id = conversation_id
             bot.parent_message_id = parent_message_id
-        # elif conversation_id != '':
-        #     bot.conversation_id = conversation_id
-        # response = bot.ask(user_prompt)
-        response = []
-        for chunk in bot.ask_stream(user_prompt, token):
-            response.append(chunk)
-            yield chunk
-            
-        if len(response) > 0:         
-            response = reduce(operator.add, response)
-        else: response =  "Unusable response produced, maybe login session expired. Try 'pkill firefox' and 'chatgpt install'"
-        print(response)
-        if response != "Unusable response produced, maybe login session expired. Try 'pkill firefox' and 'chatgpt install'": 
-            conversation_id = bot.conversation_id
-            parent_message_id = bot.parent_message_id
-            insert_sql = 'INSERT INTO chat_messages (conversation_name, conversation_id, parent_message_id, user_prompt, response) VALUES (?, ?, ?, ?, ?)'
-            cursor.execute(insert_sql, (conversation_name, conversation_id, parent_message_id, user_prompt, response))
-        else:
-            print('KKKKKKKKKKKKKKKKKIIIIIIIIIIIILLLLLLLLLLLLLLLLLLLLLLLL')
-        # db.commit()
-        # db.close()
-        return
         
-    print('GOING TO RUN CHUNKS LOOP FOR:', conversation_id, parent_message_id, user_prompt)
-    response = []
+        if token =='':
+            response = bot.ask_stream(user_prompt)
+        else: 
+            print(bot.session)
+            response = bot.ask_stream(user_prompt, token)
+        conversation_id = bot.conversation_id
 
-    for chunk in asking(browser, conversation_id, parent_message_id, user_prompt):
-        print('CHUNKCHUNKCHUNK', chunk)
-        sio.emit('chunks', {'chunk': chunk})
+            
+        #returning data back
+        print (response,bot.conversation_id, bot.parent_message_id)
+        return response,bot.conversation_id, bot.parent_message_id
 
-        response.append(chunk)
-    if len(response) > 0:         
-        response = reduce(operator.add, response)
-    else: response =  "Unusable response produced, maybe login session expired. Try 'pkill firefox' and 'chatgpt install'"
-    print('full res: ', response)
+    tok = ''
+    response, conversation_id, parent_message_id = asking(browser, conversation_id, parent_message_id, user_prompt,tok)
+    # resp =  make_response(jsonify({'response': response, 'conversation_id': conversation_id, 'parent_message_id': parent_message_id}))
+    resp =  make_response(jsonify({'response': response}))
 
-    # response = asking(browser, conversation_id, parent_message_id, user_prompt)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+
+    print(resp)
+    # Insert the new chat message into the database
+    
+    insert_sql = 'INSERT INTO chat_messages (tok, conversation_name, conversation_id, parent_message_id, user_prompt, response) VALUES (?, ?, ?, ?, ?, ?)'
+    cursor.execute(insert_sql, (tok,conversation_name, conversation_id, parent_message_id, user_prompt, response))
     db.commit()
+    # Close the connection to the database
     db.close()
-    sio.emit('response', {'result': response}, room=sid)
-    return
+    
+    # Return the response to the client
+    return resp
 
-@sio.on('gpt_messages')
-def gpt_history(sid, data):
-    name = data['name']
-    x = data['history']
+@app.route('/gpt/messages', methods=['GET'])
+def gpt_history():
+    name = request.args.get('name')
+    x = request.args.get('x')
     print('NAME O X: ',name,x)
     #open connection to database
     db = sqlite3.connect('database.db')
@@ -321,15 +311,15 @@ def gpt_history(sid, data):
           # close connection to database
     db.close()
     #return conversation_messages to client
-    sio.emit('msgs',{'result': conversation_messages}, room=sid )
-
+    print(conversation_messages)
+    resp =  make_response(jsonify({"messages": conversation_messages}))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET'
+    return resp
 
 if __name__ == '__main__':
     start_browser()
-    print('OK')
-    eventlet.wsgi.server(eventlet.listen(('0.0.0.0', 3002)), app, log_output=True)
+    app.run(host='0.0.0.0', port=3002, threaded = False)
+    # app.run(host='0.0.0.0', port=3002, threaded = True)
 
 
-    #FOR FLASK_SOCKETIO THIS SHOULD BE:
-    # socketio.run(app, host='0.0.0.0', port=3002)
-    # socketio.run(app)
