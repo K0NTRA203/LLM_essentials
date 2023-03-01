@@ -611,9 +611,7 @@ class Line2D(Artist):
         p : float or callable[[Artist, Event], tuple[bool, dict]]
             If a float, it is used as the pick radius in points.
         """
-        if callable(p):
-            self._contains = p
-        else:
+        if not callable(p):
             self.set_pickradius(p)
         self._picker = p
 
@@ -1276,6 +1274,15 @@ class Line2D(Artist):
         ----------
         x : 1D array
         """
+        if not np.iterable(x):
+            # When deprecation cycle is completed
+            # raise RuntimeError('x must be a sequence')
+            _api.warn_deprecated(
+                since=3.7,
+                message="Setting data with a non sequence type "
+                "is deprecated since %(since)s and will be "
+                "remove %(removal)s")
+            x = [x, ]
         self._xorig = copy.copy(x)
         self._invalidx = True
         self.stale = True
@@ -1288,6 +1295,15 @@ class Line2D(Artist):
         ----------
         y : 1D array
         """
+        if not np.iterable(y):
+            # When deprecation cycle is completed
+            # raise RuntimeError('y must be a sequence')
+            _api.warn_deprecated(
+                since=3.7,
+                message="Setting data with a non sequence type "
+                "is deprecated since %(since)s and will be "
+                "remove %(removal)s")
+            y = [y, ]
         self._yorig = copy.copy(y)
         self._invalidy = True
         self.stale = True

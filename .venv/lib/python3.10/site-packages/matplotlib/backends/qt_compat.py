@@ -21,7 +21,6 @@ import contextlib
 from packaging.version import parse as parse_version
 
 import matplotlib as mpl
-from matplotlib import _api
 
 from . import _QT_FORCE_QT5_BINDING
 
@@ -126,7 +125,6 @@ elif QT_API is None:  # See above re: dict.__getitem__.
             (_setup_pyqt5plus, QT_API_PYQT5),
             (_setup_pyqt5plus, QT_API_PYSIDE2),
         ]
-
     for _setup, QT_API in _candidates:
         try:
             _setup()
@@ -139,13 +137,21 @@ elif QT_API is None:  # See above re: dict.__getitem__.
             .format(", ".join(_ETS.values())))
 else:  # We should not get there.
     raise AssertionError(f"Unexpected QT_API: {QT_API}")
+_version_info = tuple(QtCore.QLibraryInfo.version().segments())
+
+
+if _version_info < (5, 10):
+    raise ImportError(
+        f"The Qt version imported is "
+        f"{QtCore.QLibraryInfo.version().toString()} but Matplotlib requires "
+        f"Qt>=5.10")
 
 
 # Fixes issues with Big Sur
 # https://bugreports.qt.io/browse/QTBUG-87014, fixed in qt 5.15.2
 if (sys.platform == 'darwin' and
         parse_version(platform.mac_ver()[0]) >= parse_version("10.16") and
-        QtCore.QLibraryInfo.version().segments() <= [5, 15, 2]):
+        _version_info < (5, 15, 2)):
     os.environ.setdefault("QT_MAC_WANTS_LAYER", "1")
 
 
@@ -166,36 +172,6 @@ def _enum(name):
 def _exec(obj):
     # exec on PyQt6, exec_ elsewhere.
     obj.exec() if hasattr(obj, "exec") else obj.exec_()
-
-
-def _devicePixelRatioF(obj):
-    """
-    Return obj.devicePixelRatioF() with graceful fallback for older Qt.
-
-    This can be replaced by the direct call when we require Qt>=5.6.
-    """
-    try:
-        # Not available on Qt<5.6
-        return obj.devicePixelRatioF() or 1
-    except AttributeError:
-        pass
-    try:
-        # Not available on older Qt5.
-        # self.devicePixelRatio() returns 0 in rare cases
-        return obj.devicePixelRatio() or 1
-    except AttributeError:
-        return 1
-
-
-def _setDevicePixelRatio(obj, val):
-    """
-    Call obj.setDevicePixelRatio(val) with graceful fallback for older Qt.
-
-    This can be replaced by the direct call when we require Qt>=5.6.
-    """
-    if hasattr(obj, 'setDevicePixelRatio'):
-        # Not available on older Qt5.
-        obj.setDevicePixelRatio(val)
 
 
 @contextlib.contextmanager
@@ -267,11 +243,3 @@ def _maybe_allow_interrupt(qapp):
             signal.signal(signal.SIGINT, old_sigint_handler)
             if handler_args is not None:
                 old_sigint_handler(*handler_args)
-
-
-@_api.caching_module_getattr
-class __getattr__:
-    ETS = _api.deprecated("3.5")(property(lambda self: dict(
-        pyqt5=(QT_API_PYQT5, 5), pyside2=(QT_API_PYSIDE2, 5))))
-    QT_RC_MAJOR_VERSION = _api.deprecated("3.5")(property(
-        lambda self: int(QtCore.qVersion().split(".")[0])))

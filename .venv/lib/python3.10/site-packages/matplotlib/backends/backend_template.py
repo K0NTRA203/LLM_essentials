@@ -10,9 +10,9 @@ and your program will (should!) run without error, though no output is
 produced.  This provides a starting point for backend writers; you can
 selectively implement drawing methods (`~.RendererTemplate.draw_path`,
 `~.RendererTemplate.draw_image`, etc.) and slowly see your figure come to life
-instead having to have a full blown implementation before getting any results.
+instead having to have a full-blown implementation before getting any results.
 
-Copy this file to a directory outside of the Matplotlib source tree, somewhere
+Copy this file to a directory outside the Matplotlib source tree, somewhere
 where Python can import it (by adding the directory to your ``sys.path`` or by
 packaging it as a normal Python package); if the backend is importable as
 ``import my.backend`` you can then select it using ::
@@ -122,7 +122,7 @@ class GraphicsContextTemplate(GraphicsContextBase):
     do the mapping here, you'll need to override several of the setter
     methods.
 
-    The base GraphicsContext stores colors as a RGB tuple on the unit
+    The base GraphicsContext stores colors as an RGB tuple on the unit
     interval, e.g., (0.5, 0.0, 1.0). You may need to map this to colors
     appropriate for your backend.
     """
@@ -136,23 +136,13 @@ class GraphicsContextTemplate(GraphicsContextBase):
 ########################################################################
 
 
-def show(*, block=None):
-    """
-    For image backends - is not required.
-    For GUI backends - show() is usually the last line of a pyplot script and
-    tells the backend that it is time to draw.  In interactive mode, this
-    should do nothing.
-    """
-    for manager in Gcf.get_all_fig_managers():
-        # do something to display the GUI
-        pass
-
-
 class FigureManagerTemplate(FigureManagerBase):
     """
     Helper class for pyplot mode, wraps everything up into a neat bundle.
 
-    For non-interactive backends, the base class is sufficient.
+    For non-interactive backends, the base class is sufficient.  For
+    interactive backends, see the documentation of the `.FigureManagerBase`
+    class for the list of methods that can/should be overridden.
     """
 
 
@@ -197,8 +187,7 @@ class FigureCanvasTemplate(FigureCanvasBase):
     # you should add it to the class-scope filetypes dictionary as follows:
     filetypes = {**FigureCanvasBase.filetypes, 'foo': 'My magic Foo format'}
 
-    @_api.delete_parameter("3.5", "args")
-    def print_foo(self, filename, *args, **kwargs):
+    def print_foo(self, filename, **kwargs):
         """
         Write out format foo.
 

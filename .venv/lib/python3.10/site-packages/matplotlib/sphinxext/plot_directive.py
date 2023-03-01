@@ -55,10 +55,10 @@ The ``.. plot::`` directive supports the following options:
         the ``plot_include_source`` variable in :file:`conf.py` (which itself
         defaults to False).
 
-    ``:encoding:`` : str
-        If this source file is in a non-UTF8 or non-ASCII encoding, the
-        encoding must be specified using the ``:encoding:`` option.  The
-        encoding will not be inferred using the ``-*- coding -*-`` metacomment.
+    ``:show-source-link:`` : bool
+        Whether to show a link to the source in HTML. The default can be
+        changed using the ``plot_html_show_source_link`` variable in
+        :file:`conf.py` (which itself defaults to True).
 
     ``:context:`` : bool or str
         If provided, the code will be run in the context of all previous plot
@@ -161,7 +161,7 @@ import jinja2  # Sphinx dependency.
 import matplotlib
 from matplotlib.backend_bases import FigureManagerBase
 import matplotlib.pyplot as plt
-from matplotlib import _api, _pylab_helpers, cbook
+from matplotlib import _pylab_helpers, cbook
 
 matplotlib.use("agg")
 
@@ -193,11 +193,6 @@ def _option_context(arg):
 
 def _option_format(arg):
     return directives.choice(arg, ('python', 'doctest'))
-
-
-def _deprecated_option_encoding(arg):
-    _api.warn_deprecated("3.5", name="encoding", obj_type="option")
-    return directives.encoding(arg)
 
 
 def mark_plot_labels(app, document):
@@ -245,10 +240,10 @@ class PlotDirective(Directive):
         'align': Image.align,
         'class': directives.class_option,
         'include-source': _option_boolean,
+        'show-source-link': _option_boolean,
         'format': _option_format,
         'context': _option_context,
         'nofigs': directives.flag,
-        'encoding': _deprecated_option_encoding,
         'caption': directives.unchanged,
         }
 
@@ -310,47 +305,25 @@ def contains_doctest(text):
     return bool(m)
 
 
-@_api.deprecated("3.5", alternative="doctest.script_from_examples")
-def unescape_doctest(text):
-    """
-    Extract code from a piece of text, which contains either Python code
-    or doctests.
-    """
-    if not contains_doctest(text):
-        return text
-    code = ""
-    for line in text.split("\n"):
-        m = re.match(r'^\s*(>>>|\.\.\.) (.*)$', line)
-        if m:
-            code += m.group(2) + "\n"
-        elif line.strip():
-            code += "# " + line.strip() + "\n"
-        else:
-            code += "\n"
-    return code
-
-
-@_api.deprecated("3.5")
-def split_code_at_show(text):
+def _split_code_at_show(text, function_name):
     """Split code at plt.show()."""
-    return _split_code_at_show(text)[1]
 
-
-def _split_code_at_show(text):
-    """Split code at plt.show()."""
-    parts = []
     is_doctest = contains_doctest(text)
-    part = []
-    for line in text.split("\n"):
-        if (not is_doctest and line.strip() == 'plt.show()') or \
-               (is_doctest and line.strip() == '>>> plt.show()'):
-            part.append(line)
+    if function_name is None:
+        parts = []
+        part = []
+        for line in text.split("\n"):
+            if ((not is_doctest and line.startswith('plt.show(')) or
+                   (is_doctest and line.strip() == '>>> plt.show()')):
+                part.append(line)
+                parts.append("\n".join(part))
+                part = []
+            else:
+                part.append(line)
+        if "\n".join(part).strip():
             parts.append("\n".join(part))
-            part = []
-        else:
-            part.append(line)
-    if "\n".join(part).strip():
-        parts.append("\n".join(part))
+    else:
+        parts = [text]
     return is_doctest, parts
 
 
@@ -363,16 +336,16 @@ TEMPLATE = """
 
 .. only:: html
 
-   {% if source_link or (html_show_formats and not multi_image) %}
+   {% if src_name or (html_show_formats and not multi_image) %}
    (
-   {%- if source_link -%}
-   `Source code <{{ source_link }}>`__
+   {%- if src_name -%}
+   :download:`Source code <{{ build_dir }}/{{ src_name }}>`
    {%- endif -%}
    {%- if html_show_formats and not multi_image -%}
      {%- for img in images -%}
        {%- for fmt in img.formats -%}
-         {%- if source_link or not loop.first -%}, {% endif -%}
-         `{{ fmt }} <{{ dest_dir }}/{{ img.basename }}.{{ fmt }}>`__
+         {%- if src_name or not loop.first -%}, {% endif -%}
+         :download:`{{ fmt }} <{{ build_dir }}/{{ img.basename }}.{{ fmt }}>`
        {%- endfor -%}
      {%- endfor -%}
    {%- endif -%}
@@ -389,7 +362,7 @@ TEMPLATE = """
         (
         {%- for fmt in img.formats -%}
         {%- if not loop.first -%}, {% endif -%}
-        `{{ fmt }} <{{ dest_dir }}/{{ img.basename }}.{{ fmt }}>`__
+        :download:`{{ fmt }} <{{ build_dir }}/{{ img.basename }}.{{ fmt }}>`
         {%- endfor -%}
         )
       {%- endif -%}
@@ -463,15 +436,6 @@ class PlotError(RuntimeError):
     pass
 
 
-@_api.deprecated("3.5")
-def run_code(code, code_path, ns=None, function_name=None):
-    """
-    Import a Python module from a path, and run the function given by
-    name, if function_name is not None.
-    """
-    _run_code(unescape_doctest(code), code_path, ns, function_name)
-
-
 def _run_code(code, code_path, ns=None, function_name=None):
     """
     Import a Python module from a path, and run the function given by
@@ -486,13 +450,13 @@ def _run_code(code, code_path, ns=None, function_name=None):
         try:
             os.chdir(setup.config.plot_working_directory)
         except OSError as err:
-            raise OSError(str(err) + '\n`plot_working_directory` option in'
-                          'Sphinx configuration file must be a valid '
-                          'directory path') from err
+            raise OSError(f'{err}\n`plot_working_directory` option in '
+                          f'Sphinx configuration file must be a valid '
+                          f'directory path') from err
         except TypeError as err:
-            raise TypeError(str(err) + '\n`plot_working_directory` option in '
-                            'Sphinx configuration file must be a string or '
-                            'None') from err
+            raise TypeError(f'{err}\n`plot_working_directory` option in '
+                            f'Sphinx configuration file must be a string or '
+                            f'None') from err
     elif code_path is not None:
         dirname = os.path.abspath(os.path.dirname(code_path))
         os.chdir(dirname)
@@ -560,14 +524,15 @@ def render_figures(code, code_path, output_dir, output_base, context,
     Save the images under *output_dir* with file names derived from
     *output_base*
     """
+    if function_name is not None:
+        output_base = f'{output_base}_{function_name}'
     formats = get_plot_formats(config)
 
     # Try to determine if all images already exist
 
-    is_doctest, code_pieces = _split_code_at_show(code)
+    is_doctest, code_pieces = _split_code_at_show(code, function_name)
 
     # Look for single-figure output files first
-    all_exists = True
     img = ImageFile(output_base, output_dir)
     for format, dpi in formats:
         if context or out_of_date(code_path, img.filename(format),
@@ -575,13 +540,14 @@ def render_figures(code, code_path, output_dir, output_base, context,
             all_exists = False
             break
         img.formats.append(format)
+    else:
+        all_exists = True
 
     if all_exists:
         return [(code, [img])]
 
     # Then look for multi-figure output files
     results = []
-    all_exists = True
     for i, code_piece in enumerate(code_pieces):
         images = []
         for j in itertools.count():
@@ -605,6 +571,8 @@ def render_figures(code, code_path, output_dir, output_base, context,
         if not all_exists:
             break
         results.append((code_piece, images))
+    else:
+        all_exists = True
 
     if all_exists:
         return results
@@ -666,6 +634,7 @@ def run(arguments, content, options, state_machine, state, lineno):
     default_fmt = formats[0][0]
 
     options.setdefault('include-source', config.plot_include_source)
+    options.setdefault('show-source-link', config.plot_html_show_source_link)
     if 'class' in options:
         # classes are parsed into a list of string, and output by simply
         # printing the list, abusing the fact that RST guarantees to strip
@@ -749,21 +718,13 @@ def run(arguments, content, options, state_machine, state, lineno):
     build_dir = os.path.normpath(build_dir)
     os.makedirs(build_dir, exist_ok=True)
 
-    # output_dir: final location in the builder's directory
-    dest_dir = os.path.abspath(os.path.join(setup.app.builder.outdir,
-                                            source_rel_dir))
-    os.makedirs(dest_dir, exist_ok=True)
-
     # how to link to files from the RST file
-    dest_dir_link = os.path.join(relpath(setup.confdir, rst_dir),
-                                 source_rel_dir).replace(os.path.sep, '/')
     try:
         build_dir_link = relpath(build_dir, rst_dir).replace(os.path.sep, '/')
     except ValueError:
         # on Windows, relpath raises ValueError when path and start are on
         # different mounts/drives
         build_dir_link = build_dir
-    source_link = dest_dir_link + '/' + output_base + source_ext
 
     # get list of included rst files so that the output is updated when any
     # plots in the included files change. These attributes are modified by the
@@ -784,15 +745,23 @@ def run(arguments, content, options, state_machine, state, lineno):
     except ValueError:
         pass
 
+    # save script (if necessary)
+    if options['show-source-link']:
+        Path(build_dir, output_base + source_ext).write_text(
+            doctest.script_from_examples(code)
+            if source_file_name == rst_file and is_doctest
+            else code,
+            encoding='utf-8')
+
     # make figures
     try:
-        results = render_figures(code,
-                                 source_file_name,
-                                 build_dir,
-                                 output_base,
-                                 keep_context,
-                                 function_name,
-                                 config,
+        results = render_figures(code=code,
+                                 code_path=source_file_name,
+                                 output_dir=build_dir,
+                                 output_base=output_base,
+                                 context=keep_context,
+                                 function_name=function_name,
+                                 config=config,
                                  context_reset=context_opt == 'reset',
                                  close_figs=context_opt == 'close-figs',
                                  code_includes=source_file_includes)
@@ -830,18 +799,17 @@ def run(arguments, content, options, state_machine, state, lineno):
             ':%s: %s' % (key, val) for key, val in options.items()
             if key in ('alt', 'height', 'width', 'scale', 'align', 'class')]
 
-        # Not-None src_link signals the need for a source link in the generated
-        # html
-        if j == 0 and config.plot_html_show_source_link:
-            src_link = source_link
+        # Not-None src_name signals the need for a source download in the
+        # generated html
+        if j == 0 and options['show-source-link']:
+            src_name = output_base + source_ext
         else:
-            src_link = None
+            src_name = None
 
         result = jinja2.Template(config.plot_template or TEMPLATE).render(
             default_fmt=default_fmt,
-            dest_dir=dest_dir_link,
             build_dir=build_dir_link,
-            source_link=src_link,
+            src_name=src_name,
             multi_image=len(images) > 1,
             options=opts,
             images=images,
@@ -854,23 +822,5 @@ def run(arguments, content, options, state_machine, state, lineno):
 
     if total_lines:
         state_machine.insert_input(total_lines, source=source_file_name)
-
-    # copy image files to builder's output directory, if necessary
-    Path(dest_dir).mkdir(parents=True, exist_ok=True)
-
-    for code_piece, images in results:
-        for img in images:
-            for fn in img.filenames():
-                destimg = os.path.join(dest_dir, os.path.basename(fn))
-                if fn != destimg:
-                    shutil.copyfile(fn, destimg)
-
-    # copy script (if necessary)
-    if config.plot_html_show_source_link:
-        Path(dest_dir, output_base + source_ext).write_text(
-            doctest.script_from_examples(code)
-            if source_file_name == rst_file and is_doctest
-            else code,
-            encoding='utf-8')
 
     return errors

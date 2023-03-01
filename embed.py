@@ -10,10 +10,10 @@ import time
 from openai_api import playground
 from io import StringIO
 import PyPDF2
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
-
-
-# import matplotlib
 # import pinecone
 # piencone.init(api_key='')
 # from transformers import AutoModel, AutoTokenizer
@@ -217,7 +217,7 @@ def _similarity(query,csv_loc, model='text-embedding-ada-002', n=3):
     return res
 
 def _query_csv(query, csv_address, n = 3):
-    openai.api_key = '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'
+    openai.api_key = os.environ['OPENAI_KEY']
     query_embedding = get_embedding(query, engine='text-embedding-ada-002')
     x = _similarity(query_embedding,csv_address,n)
    
@@ -266,7 +266,7 @@ def pdf_to_df(pdf_location):
 
 
 def df_add_embedding(df, out_loc = 'knowledge/embedded.csv', model='text-embedding-ada-002'):
-    openai.api_key = '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'
+    openai.api_key = os.environ['OPENAI_KEY']
     df_new = _tiktoken_encoding(df)
     # Add a delay of 1 second between requests
     for index, row in df_new.iterrows():
@@ -280,7 +280,7 @@ def df_add_embedding(df, out_loc = 'knowledge/embedded.csv', model='text-embeddi
 def query_intel(prompt, intel_loc, model, max_tokens):
     
     x = _query_csv(prompt, intel_loc,n=3)
-    openai.api_key = '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'
+    openai.api_key = os.environ['OPENAI_KEY']
     try:
         res = openai.Completion.create(prompt= x, model=model, max_tokens = max_tokens)
         print(res)

@@ -223,12 +223,7 @@ class RendererAgg(RendererBase):
 
         _api.check_in_list(["TeX", True, False], ismath=ismath)
         if ismath == "TeX":
-            # todo: handle props
-            texmanager = self.get_texmanager()
-            fontsize = prop.get_size_in_points()
-            w, h, d = texmanager.get_text_width_height_descent(
-                s, fontsize, renderer=self)
-            return w, h, d
+            return super().get_text_width_height_descent(s, prop, ismath)
 
         if ismath:
             ox, oy, width, height, descent, font_image = \
@@ -340,7 +335,7 @@ class RendererAgg(RendererBase):
 
     def start_filter(self):
         """
-        Start filtering. It simply create a new canvas (the old one is saved).
+        Start filtering. It simply creates a new canvas (the old one is saved).
         """
         self._filter_renderers.append(self._renderer)
         self._renderer = _RendererAgg(int(self.width), int(self.height),
@@ -349,7 +344,7 @@ class RendererAgg(RendererBase):
 
     def stop_filter(self, post_processing):
         """
-        Save the plot in the current canvas as a image and apply
+        Save the plot in the current canvas as an image and apply
         the *post_processing* function.
 
            def post_processing(image, dpi):
@@ -446,8 +441,7 @@ class FigureCanvasAgg(FigureCanvasBase):
         """
         return self.renderer.buffer_rgba()
 
-    @_api.delete_parameter("3.5", "args")
-    def print_raw(self, filename_or_obj, *args):
+    def print_raw(self, filename_or_obj):
         FigureCanvasAgg.draw(self)
         renderer = self.get_renderer()
         with cbook.open_file_cm(filename_or_obj, "wb") as fh:
@@ -465,9 +459,7 @@ class FigureCanvasAgg(FigureCanvasBase):
             filename_or_obj, self.buffer_rgba(), format=fmt, origin="upper",
             dpi=self.figure.dpi, metadata=metadata, pil_kwargs=pil_kwargs)
 
-    @_api.delete_parameter("3.5", "args")
-    def print_png(self, filename_or_obj, *args,
-                  metadata=None, pil_kwargs=None):
+    def print_png(self, filename_or_obj, *, metadata=None, pil_kwargs=None):
         """
         Write the figure to a PNG file.
 
@@ -526,8 +518,7 @@ class FigureCanvasAgg(FigureCanvasBase):
     # print_figure(), and the latter ensures that `self.figure.dpi` already
     # matches the dpi kwarg (if any).
 
-    @_api.delete_parameter("3.5", "args")
-    def print_jpg(self, filename_or_obj, *args, pil_kwargs=None):
+    def print_jpg(self, filename_or_obj, *, pil_kwargs=None):
         # savefig() has already applied savefig.facecolor; we now set it to
         # white to make imsave() blend semi-transparent figures against an
         # assumed white background.

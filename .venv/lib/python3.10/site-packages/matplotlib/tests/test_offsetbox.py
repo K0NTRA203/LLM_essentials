@@ -13,7 +13,7 @@ from matplotlib.backend_bases import MouseButton, MouseEvent
 
 from matplotlib.offsetbox import (
     AnchoredOffsetbox, AnnotationBbox, AnchoredText, DrawingArea, OffsetBox,
-    OffsetImage, TextArea, _get_packed_offsets)
+    OffsetImage, PaddedBox, TextArea, _get_packed_offsets, HPacker, VPacker)
 
 
 @image_comparison(['offsetbox_clipping'], remove_text=True)
@@ -122,71 +122,69 @@ def test_expand_with_tight_layout():
     fig.tight_layout()  # where the crash used to happen
 
 
-@pytest.mark.parametrize('wd_list',
-                         ([(150, 1)], [(150, 1)]*3, [(0.1, 1)], [(0.1, 1)]*2))
+@pytest.mark.parametrize('widths',
+                         ([150], [150, 150, 150], [0.1], [0.1, 0.1]))
 @pytest.mark.parametrize('total', (250, 100, 0, -1, None))
 @pytest.mark.parametrize('sep', (250, 1, 0, -1))
 @pytest.mark.parametrize('mode', ("expand", "fixed", "equal"))
-def test_get_packed_offsets(wd_list, total, sep, mode):
+def test_get_packed_offsets(widths, total, sep, mode):
     # Check a (rather arbitrary) set of parameters due to successive similar
     # issue tickets (at least #10476 and #10784) related to corner cases
     # triggered inside this function when calling higher-level functions
     # (e.g. `Axes.legend`).
     # These are just some additional smoke tests. The output is untested.
-    _get_packed_offsets(wd_list, total, sep, mode=mode)
+    _get_packed_offsets(widths, total, sep, mode=mode)
 
 
 _Params = namedtuple('_params', 'wd_list, total, sep, expected')
 
 
-@pytest.mark.parametrize('wd_list, total, sep, expected', [
+@pytest.mark.parametrize('widths, total, sep, expected', [
     _Params(  # total=None
-        [(3, 0), (1, 0), (2, 0)], total=None, sep=1, expected=(8, [0, 4, 6])),
+        [3, 1, 2], total=None, sep=1, expected=(8, [0, 4, 6])),
     _Params(  # total larger than required
-        [(3, 0), (1, 0), (2, 0)], total=10, sep=1, expected=(10, [0, 4, 6])),
+        [3, 1, 2], total=10, sep=1, expected=(10, [0, 4, 6])),
     _Params(  # total smaller than required
-        [(3, 0), (1, 0), (2, 0)], total=5, sep=1, expected=(5, [0, 4, 6])),
+        [3, 1, 2], total=5, sep=1, expected=(5, [0, 4, 6])),
 ])
-def test_get_packed_offsets_fixed(wd_list, total, sep, expected):
-    result = _get_packed_offsets(wd_list, total, sep, mode='fixed')
+def test_get_packed_offsets_fixed(widths, total, sep, expected):
+    result = _get_packed_offsets(widths, total, sep, mode='fixed')
     assert result[0] == expected[0]
     assert_allclose(result[1], expected[1])
 
 
-@pytest.mark.parametrize('wd_list, total, sep, expected', [
+@pytest.mark.parametrize('widths, total, sep, expected', [
     _Params(  # total=None (implicit 1)
-        [(.1, 0)] * 3, total=None, sep=None, expected=(1, [0, .45, .9])),
+        [.1, .1, .1], total=None, sep=None, expected=(1, [0, .45, .9])),
     _Params(  # total larger than sum of widths
-        [(3, 0), (1, 0), (2, 0)], total=10, sep=1, expected=(10, [0, 5, 8])),
+        [3, 1, 2], total=10, sep=1, expected=(10, [0, 5, 8])),
     _Params(  # total smaller sum of widths: overlapping boxes
-        [(3, 0), (1, 0), (2, 0)], total=5, sep=1, expected=(5, [0, 2.5, 3])),
+        [3, 1, 2], total=5, sep=1, expected=(5, [0, 2.5, 3])),
 ])
-def test_get_packed_offsets_expand(wd_list, total, sep, expected):
-    result = _get_packed_offsets(wd_list, total, sep, mode='expand')
+def test_get_packed_offsets_expand(widths, total, sep, expected):
+    result = _get_packed_offsets(widths, total, sep, mode='expand')
     assert result[0] == expected[0]
     assert_allclose(result[1], expected[1])
 
 
-@pytest.mark.parametrize('wd_list, total, sep, expected', [
+@pytest.mark.parametrize('widths, total, sep, expected', [
     _Params(  # total larger than required
-        [(3, 0), (2, 0), (1, 0)], total=6, sep=None, expected=(6, [0, 2, 4])),
+        [3, 2, 1], total=6, sep=None, expected=(6, [0, 2, 4])),
     _Params(  # total smaller sum of widths: overlapping boxes
-        [(3, 0), (2, 0), (1, 0), (.5, 0)], total=2, sep=None,
-        expected=(2, [0, 0.5, 1, 1.5])),
+        [3, 2, 1, .5], total=2, sep=None, expected=(2, [0, 0.5, 1, 1.5])),
     _Params(  # total larger than required
-        [(.5, 0), (1, 0), (.2, 0)], total=None, sep=1,
-        expected=(6, [0, 2, 4])),
+        [.5, 1, .2], total=None, sep=1, expected=(6, [0, 2, 4])),
     # the case total=None, sep=None is tested separately below
 ])
-def test_get_packed_offsets_equal(wd_list, total, sep, expected):
-    result = _get_packed_offsets(wd_list, total, sep, mode='equal')
+def test_get_packed_offsets_equal(widths, total, sep, expected):
+    result = _get_packed_offsets(widths, total, sep, mode='equal')
     assert result[0] == expected[0]
     assert_allclose(result[1], expected[1])
 
 
 def test_get_packed_offsets_equal_total_none_sep_none():
     with pytest.raises(ValueError):
-        _get_packed_offsets([(1, 0)] * 3, total=None, sep=None, mode='equal')
+        _get_packed_offsets([1, 1, 1], total=None, sep=None, mode='equal')
 
 
 @pytest.mark.parametrize('child_type', ['draw', 'image', 'text'])
@@ -337,3 +335,61 @@ def test_arrowprops_copied():
                         arrowprops=arrowprops)
     assert ab.arrowprops is not ab
     assert arrowprops["relpos"] == (.3, .7)
+
+
+@pytest.mark.parametrize("align", ["baseline", "bottom", "top",
+                                   "left", "right", "center"])
+def test_packers(align):
+    # set the DPI to match points to make the math easier below
+    fig = plt.figure(dpi=72)
+    renderer = fig.canvas.get_renderer()
+
+    x1, y1 = 10, 30
+    x2, y2 = 20, 60
+    r1 = DrawingArea(x1, y1)
+    r2 = DrawingArea(x2, y2)
+
+    # HPacker
+    hpacker = HPacker(children=[r1, r2], align=align)
+    hpacker.draw(renderer)
+    bbox = hpacker.get_bbox(renderer)
+    px, py = hpacker.get_offset(bbox, renderer)
+    # width, height, xdescent, ydescent
+    assert_allclose(bbox.bounds, (0, 0, x1 + x2, max(y1, y2)))
+    # internal element placement
+    if align in ("baseline", "left", "bottom"):
+        y_height = 0
+    elif align in ("right", "top"):
+        y_height = y2 - y1
+    elif align == "center":
+        y_height = (y2 - y1) / 2
+    # x-offsets, y-offsets
+    assert_allclose([child.get_offset() for child in hpacker.get_children()],
+                    [(px, py + y_height), (px + x1, py)])
+
+    # VPacker
+    vpacker = VPacker(children=[r1, r2], align=align)
+    vpacker.draw(renderer)
+    bbox = vpacker.get_bbox(renderer)
+    px, py = vpacker.get_offset(bbox, renderer)
+    # width, height, xdescent, ydescent
+    assert_allclose(bbox.bounds, (0, -max(y1, y2), max(x1, x2), y1 + y2))
+    # internal element placement
+    if align in ("baseline", "left", "bottom"):
+        x_height = 0
+    elif align in ("right", "top"):
+        x_height = x2 - x1
+    elif align == "center":
+        x_height = (x2 - x1) / 2
+    # x-offsets, y-offsets
+    assert_allclose([child.get_offset() for child in vpacker.get_children()],
+                    [(px + x_height, py), (px, py - y2)])
+
+
+def test_paddedbox():
+    # smoke test paddedbox for correct default value
+    fig, ax = plt.subplots()
+    at = AnchoredText("foo",  'upper left')
+    pb = PaddedBox(at, patch_attrs={'facecolor': 'r'}, draw_frame=True)
+    ax.add_artist(pb)
+    fig.draw_without_rendering()

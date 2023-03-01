@@ -389,6 +389,11 @@ class InvertedSymmetricalLogTransform(Transform):
 
     def transform_non_affine(self, a):
         abs_a = np.abs(a)
+        if (abs_a < self.linthresh).all():
+            _api.warn_external(
+                "All values for SymLogScale are below linthresh, making "
+                "it effectively linear. You likely should lower the value "
+                "of linthresh. ")
         with np.errstate(divide="ignore", invalid="ignore"):
             out = np.sign(a) * self.linthresh * (
                 np.power(self.base,
@@ -705,11 +710,6 @@ def scale_factory(scale, axis, **kwargs):
     scale : {%(names)s}
     axis : `matplotlib.axis.Axis`
     """
-    if scale != scale.lower():
-        _api.warn_deprecated(
-            "3.5", message="Support for case-insensitive scales is deprecated "
-            "since %(since)s and support will be removed %(removal)s.")
-        scale = scale.lower()
     scale_cls = _api.check_getitem(_scale_mapping, scale=scale)
     return scale_cls(axis, **kwargs)
 

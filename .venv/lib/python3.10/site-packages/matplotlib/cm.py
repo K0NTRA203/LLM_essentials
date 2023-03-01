@@ -27,13 +27,6 @@ from matplotlib._cm import datad
 from matplotlib._cm_listed import cmaps as cmaps_listed
 
 
-@_api.caching_module_getattr  # module-level deprecations
-class __getattr__:
-    LUTSIZE = _api.deprecated(
-        "3.5", obj_type="", alternative="rcParams['image.lut']")(
-            property(lambda self: _LUTSIZE))
-
-
 _LUTSIZE = mpl.rcParams['image.lut']
 
 
@@ -227,11 +220,7 @@ _colormaps = ColormapRegistry(_gen_cmap_registry())
 globals().update(_colormaps)
 
 
-@_api.deprecated(
-    '3.6',
-    pending=True,
-    alternative="``matplotlib.colormaps.register(name)``"
-)
+@_api.deprecated("3.7", alternative="``matplotlib.colormaps.register(name)``")
 def register_cmap(name=None, cmap=None, *, override_builtin=False):
     """
     Add a colormap to the set recognized by :func:`get_cmap`.
@@ -306,9 +295,8 @@ def _get_cmap(name=None, lut=None):
 # do it in two steps like this so we can have an un-deprecated version in
 # pyplot.
 get_cmap = _api.deprecated(
-    '3.6',
+    '3.7',
     name='get_cmap',
-    pending=True,
     alternative=(
         "``matplotlib.colormaps[name]`` " +
         "or ``matplotlib.colormaps.get_cmap(obj)``"
@@ -316,11 +304,8 @@ get_cmap = _api.deprecated(
 )(_get_cmap)
 
 
-@_api.deprecated(
-    '3.6',
-    pending=True,
-    alternative="``matplotlib.colormaps.unregister(name)``"
-)
+@_api.deprecated("3.7",
+                 alternative="``matplotlib.colormaps.unregister(name)``")
 def unregister_cmap(name):
     """
     Remove a colormap recognized by :func:`get_cmap`.
@@ -417,9 +402,6 @@ class ScalarMappable:
         self.colorbar = None
         self.callbacks = cbook.CallbackRegistry(signals=["changed"])
 
-    callbacksSM = _api.deprecated("3.5", alternative="callbacks")(
-        property(lambda self: self.callbacks))
-
     def _scale_norm(self, norm, vmin, vmax):
         """
         Helper for initial scaling.
@@ -447,12 +429,12 @@ class ScalarMappable:
         Return a normalized rgba array corresponding to *x*.
 
         In the normal case, *x* is a 1D or 2D sequence of scalars, and
-        the corresponding ndarray of rgba values will be returned,
+        the corresponding `~numpy.ndarray` of rgba values will be returned,
         based on the norm and colormap set for this ScalarMappable.
 
         There is one special case, for handling images that are already
         rgb or rgba, such as might have been read from an image file.
-        If *x* is an ndarray with 3 dimensions,
+        If *x* is an `~numpy.ndarray` with 3 dimensions,
         and the last dimension is either 3 or 4, then it will be
         treated as an rgb or rgba array, and no mapping will be done.
         The array can be uint8, or it can be floating point with

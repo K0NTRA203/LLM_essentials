@@ -16,12 +16,17 @@ from matplotlib.spines import Spine
 
 
 class PolarTransform(mtransforms.Transform):
-    """
+    r"""
     The base polar transform.
 
-    This transform maps polar coordinates ``(theta, r)`` into Cartesian
-    coordinates ``(x, y) = (r * cos(theta), r * sin(theta))`` (but does not
+    This transform maps polar coordinates :math:`\theta, r` into Cartesian
+    coordinates :math:`x, y = r \cos(\theta), r \sin(\theta)`
+    (but does not fully transform into Axes coordinates or
     handle positioning in screen space).
+
+    This transformation is designed to be applied to data after any scaling
+    along the radial axis (e.g. log-scaling) has been applied to the input
+    data.
 
     Path segments at a fixed radius are automatically transformed to circular
     arcs as long as ``path._interpolation_steps > 1``.
@@ -30,29 +35,46 @@ class PolarTransform(mtransforms.Transform):
     input_dims = output_dims = 2
 
     def __init__(self, axis=None, use_rmin=True,
-                 _apply_theta_transforms=True):
+                 _apply_theta_transforms=True, *, scale_transform=None):
+        """
+        Parameters
+        ----------
+        axis : `~matplotlib.axis.Axis`, optional
+            Axis associated with this transform. This is used to get the
+            minimum radial limit.
+        use_rmin : `bool`, optional
+            If ``True``, subtract the minimum radial axis limit before
+            transforming to Cartesian coordinates. *axis* must also be
+            specified for this to take effect.
+        """
         super().__init__()
         self._axis = axis
         self._use_rmin = use_rmin
         self._apply_theta_transforms = _apply_theta_transforms
+        self._scale_transform = scale_transform
 
     __str__ = mtransforms._make_str_method(
         "_axis",
         use_rmin="_use_rmin",
         _apply_theta_transforms="_apply_theta_transforms")
 
+    def _get_rorigin(self):
+        # Get lower r limit after being scaled by the radial scale transform
+        return self._scale_transform.transform(
+            (0, self._axis.get_rorigin()))[1]
+
     def transform_non_affine(self, tr):
         # docstring inherited
-        t, r = np.transpose(tr)
+        theta, r = np.transpose(tr)
         # PolarAxes does not use the theta transforms here, but apply them for
         # backwards-compatibility if not being used by it.
         if self._apply_theta_transforms and self._axis is not None:
-            t *= self._axis.get_theta_direction()
-            t += self._axis.get_theta_offset()
+            theta *= self._axis.get_theta_direction()
+            theta += self._axis.get_theta_offset()
         if self._use_rmin and self._axis is not None:
-            r = (r - self._axis.get_rorigin()) * self._axis.get_rsign()
+            r = (r - self._get_rorigin()) * self._axis.get_rsign()
         r = np.where(r >= 0, r, np.nan)
-        return np.column_stack([r * np.cos(t), r * np.sin(t)])
+        return np.column_stack([r * np.cos(theta), r * np.sin(theta)])
 
     def transform_path_non_affine(self, path):
         # docstring inherited
@@ -74,7 +96,7 @@ class PolarTransform(mtransforms.Transform):
                     # that behavior here.
                     last_td, td = np.rad2deg([last_t, t])
                     if self._use_rmin and self._axis is not None:
-                        r = ((r - self._axis.get_rorigin())
+                        r = ((r - self._get_rorigin())
                              * self._axis.get_rsign())
                     if last_td <= td:
                         while td - last_td > 360:
@@ -115,15 +137,30 @@ class PolarTransform(mtransforms.Transform):
 
 
 class PolarAffine(mtransforms.Affine2DBase):
-    """
-    The affine part of the polar projection.  Scales the output so
-    that maximum radius rests on the edge of the axes circle.
+    r"""
+    The affine part of the polar projection.
+
+    Scales the output so that maximum radius rests on the edge of the axes
+    circle and the origin is mapped to (0.5, 0.5). The transform applied is
+    the same to x and y components and given by:
+
+    .. math::
+
+        x_{1} = 0.5 \left [ \frac{x_{0}}{(r_{\max} - r_{\min})} + 1 \right ]
+
+    :math:`r_{\min}, r_{\max}` are the minimum and maximum radial limits after
+    any scaling (e.g. log scaling) has been removed.
     """
     def __init__(self, scale_transform, limits):
         """
-        *limits* is the view limit of the data.  The only part of
-        its bounds that is used is the y limits (for the radius limits).
-        The theta range is handled by the non-affine transform.
+        Parameters
+        ----------
+        scale_transform : `~matplotlib.transforms.Transform`
+            Scaling transform for the data. This is used to remove any scaling
+            from the radial view limits.
+        limits : `~matplotlib.transforms.BboxBase`
+            View limits of the data. The only part of its bounds that is used
+            is the y limits (for the radius limits).
         """
         super().__init__()
         self._scale_transform = scale_transform
@@ -156,6 +193,17 @@ class InvertedPolarTransform(mtransforms.Transform):
 
     def __init__(self, axis=None, use_rmin=True,
                  _apply_theta_transforms=True):
+        """
+        Parameters
+        ----------
+        axis : `~matplotlib.axis.Axis`, optional
+            Axis associated with this transform. This is used to get the
+            minimum radial limit.
+        use_rmin : `bool`, optional
+            If ``True`` add the minimum radial axis limit after
+            transforming from Cartesian coordinates. *axis* must also be
+            specified for this to take effect.
+        """
         super().__init__()
         self._axis = axis
         self._use_rmin = use_rmin
@@ -252,10 +300,6 @@ class ThetaLocator(mticker.Locator):
             return np.arange(8) * 2 * np.pi / 8
         else:
             return np.deg2rad(self.base())
-
-    def refresh(self):
-        # docstring inherited
-        return self.base.refresh()
 
     def view_limits(self, vmin, vmax):
         vmin, vmax = np.rad2deg((vmin, vmax))
@@ -426,14 +470,25 @@ class RadialLocator(mticker.Locator):
                     return [tick for tick in self.base() if tick > rorigin]
         return self.base()
 
+    def _zero_in_bounds(self):
+        """
+        Return True if zero is within the valid values for the
+        scale of the radial axis.
+        """
+        vmin, vmax = self._axes.yaxis._scale.limit_range_for_scale(0, 1, 1e-5)
+        return vmin == 0
+
     def nonsingular(self, vmin, vmax):
         # docstring inherited
-        return ((0, 1) if (vmin, vmax) == (-np.inf, np.inf)  # Init. limits.
-                else self.base.nonsingular(vmin, vmax))
+        if self._zero_in_bounds() and (vmin, vmax) == (-np.inf, np.inf):
+            # Initial view limits
+            return (0, 1)
+        else:
+            return self.base.nonsingular(vmin, vmax)
 
     def view_limits(self, vmin, vmax):
         vmin, vmax = self.base.view_limits(vmin, vmax)
-        if vmax > vmin:
+        if self._zero_in_bounds() and vmax > vmin:
             # this allows inverted r/y-lims
             vmin = min(0, vmin)
         return mtransforms.nonsingular(vmin, vmax)
@@ -792,11 +847,9 @@ class PolarAxes(Axes):
         # This is moved out of __init__ because non-separable axes don't use it
         self.xaxis = ThetaAxis(self)
         self.yaxis = RadialAxis(self)
-        # Calling polar_axes.xaxis.clear() or polar_axes.xaxis.clear()
-        # results in weird artifacts. Therefore we disable this for
-        # now.
+        # Calling polar_axes.xaxis.clear() or polar_axes.yaxis.clear()
+        # results in weird artifacts. Therefore we disable this for now.
         # self.spines['polar'].register_axis(self.yaxis)
-        self._update_transScale()
 
     def _set_lim_and_transforms(self):
         # A view limit where the minimum radius can be locked if the user
@@ -835,7 +888,9 @@ class PolarAxes(Axes):
         # data.  This one is aware of rmin
         self.transProjection = self.PolarTransform(
             self,
-            _apply_theta_transforms=False)
+            _apply_theta_transforms=False,
+            scale_transform=self.transScale
+        )
         # Add dependency on rorigin.
         self.transProjection.set_children(self._originViewLim)
 
@@ -846,9 +901,25 @@ class PolarAxes(Axes):
 
         # The complete data transformation stack -- from data all the
         # way to display coordinates
+        #
+        # 1. Remove any radial axis scaling (e.g. log scaling)
+        # 2. Shift data in the theta direction
+        # 3. Project the data from polar to cartesian values
+        #    (with the origin in the same place)
+        # 4. Scale and translate the cartesian values to Axes coordinates
+        #    (here the origin is moved to the lower left of the Axes)
+        # 5. Move and scale to fill the Axes
+        # 6. Convert from Axes coordinates to Figure coordinates
         self.transData = (
-            self.transScale + self.transShift + self.transProjection +
-            (self.transProjectionAffine + self.transWedge + self.transAxes))
+            self.transScale +
+            self.transShift +
+            self.transProjection +
+            (
+                self.transProjectionAffine +
+                self.transWedge +
+                self.transAxes
+            )
+        )
 
         # This is the transform for theta-axis ticks.  It is
         # equivalent to transData, except it always puts r == 0.0 and r == 1.0
@@ -1363,17 +1434,17 @@ class PolarAxes(Axes):
 
     def can_zoom(self):
         """
-        Return whether this axes supports the zoom box button functionality.
+        Return whether this Axes supports the zoom box button functionality.
 
-        Polar axes do not support zoom boxes.
+        A polar Axes does not support zoom boxes.
         """
         return False
 
     def can_pan(self):
         """
-        Return whether this axes supports the pan/zoom button functionality.
+        Return whether this Axes supports the pan/zoom button functionality.
 
-        For polar axes, this is slightly misleading. Both panning and
+        For a polar Axes, this is slightly misleading. Both panning and
         zooming are performed by the same button. Panning is performed
         in azimuth while zooming is done along the radial.
         """

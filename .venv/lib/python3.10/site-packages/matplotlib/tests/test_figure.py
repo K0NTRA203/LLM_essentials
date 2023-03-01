@@ -236,10 +236,15 @@ def test_add_subplot_invalid():
     with pytest.raises(ValueError,
                        match='Number of rows must be a positive integer'):
         fig.add_subplot(0, 2, 1)
-    with pytest.raises(ValueError, match='num must be 1 <= num <= 4'):
+    with pytest.raises(ValueError, match='num must be an integer with '
+                                         '1 <= num <= 4'):
         fig.add_subplot(2, 2, 0)
-    with pytest.raises(ValueError, match='num must be 1 <= num <= 4'):
+    with pytest.raises(ValueError, match='num must be an integer with '
+                                         '1 <= num <= 4'):
         fig.add_subplot(2, 2, 5)
+    with pytest.raises(ValueError, match='num must be an integer with '
+                                         '1 <= num <= 4'):
+        fig.add_subplot(2, 2, 0.5)
 
     with pytest.raises(ValueError, match='must be a three-digit integer'):
         fig.add_subplot(42)
@@ -262,7 +267,7 @@ def test_add_subplot_invalid():
         fig.add_subplot(2, 2.0, 1)
     _, ax = plt.subplots()
     with pytest.raises(ValueError,
-                       match='The Subplot must have been created in the '
+                       match='The Axes must have been created in the '
                              'present figure'):
         fig.add_subplot(ax)
 
@@ -527,6 +532,13 @@ def test_savefig_pixel_ratio(backend):
     assert ratio1 == ratio2
 
 
+def test_savefig_preserve_layout_engine(tmp_path):
+    fig = plt.figure(layout='compressed')
+    fig.savefig(tmp_path / 'foo.png', bbox_inches='tight')
+
+    assert fig.get_layout_engine()._compress
+
+
 def test_figure_repr():
     fig = plt.figure(figsize=(10, 20), dpi=10)
     assert repr(fig) == "<Figure size 100x200 with 0 Axes>"
@@ -596,6 +608,17 @@ def test_invalid_layouts():
 
     with pytest.raises(RuntimeError, match='Colorbar layout of new layout'):
         fig.set_layout_engine("constrained")
+
+
+@pytest.mark.parametrize('layout', ['constrained', 'compressed'])
+def test_layout_change_warning(layout):
+    """
+    Raise a warning when a previously assigned layout changes to tight using
+    plt.tight_layout().
+    """
+    fig, ax = plt.subplots(layout=layout)
+    with pytest.warns(UserWarning, match='The figure layout has changed to'):
+        plt.tight_layout()
 
 
 @check_figures_equal(extensions=["png", "pdf"])
@@ -832,7 +855,12 @@ def test_animated_with_canvas_change(fig_test, fig_ref):
 class TestSubplotMosaic:
     @check_figures_equal(extensions=["png"])
     @pytest.mark.parametrize(
-        "x", [[["A", "A", "B"], ["C", "D", "B"]], [[1, 1, 2], [3, 4, 2]]]
+        "x", [
+            [["A", "A", "B"], ["C", "D", "B"]],
+            [[1, 1, 2], [3, 4, 2]],
+            (("A", "A", "B"), ("C", "D", "B")),
+            ((1, 1, 2), (3, 4, 2))
+        ]
     )
     def test_basic(self, fig_test, fig_ref, x):
         grid_axes = fig_test.subplot_mosaic(x)
@@ -922,6 +950,26 @@ class TestSubplotMosaic:
         fig_ref.subplot_mosaic([["F"], [x]])
         fig_test.subplot_mosaic([["F"], [xt]])
 
+    def test_nested_width_ratios(self):
+        x = [["A", [["B"],
+                    ["C"]]]]
+        width_ratios = [2, 1]
+
+        fig, axd = plt.subplot_mosaic(x, width_ratios=width_ratios)
+
+        assert axd["A"].get_gridspec().get_width_ratios() == width_ratios
+        assert axd["B"].get_gridspec().get_width_ratios() != width_ratios
+
+    def test_nested_height_ratios(self):
+        x = [["A", [["B"],
+                    ["C"]]], ["D", "D"]]
+        height_ratios = [1, 2]
+
+        fig, axd = plt.subplot_mosaic(x, height_ratios=height_ratios)
+
+        assert axd["D"].get_gridspec().get_height_ratios() == height_ratios
+        assert axd["B"].get_gridspec().get_height_ratios() != height_ratios
+
     @check_figures_equal(extensions=["png"])
     @pytest.mark.parametrize(
         "x, empty_sentinel",
@@ -962,6 +1010,10 @@ class TestSubplotMosaic:
             plt.subplot_mosaic(['foo', 'bar'])
         with pytest.raises(ValueError, match='must be 2D'):
             plt.subplot_mosaic(['foo'])
+        with pytest.raises(ValueError, match='must be 2D'):
+            plt.subplot_mosaic([['foo', ('bar',)]])
+        with pytest.raises(ValueError, match='must be 2D'):
+            plt.subplot_mosaic([['a', 'b'], [('a', 'b'), 'c']])
 
     @check_figures_equal(extensions=["png"])
     @pytest.mark.parametrize("subplot_kw", [{}, {"projection": "polar"}, None])
@@ -975,8 +1027,26 @@ class TestSubplotMosaic:
 
         axB = fig_ref.add_subplot(gs[0, 1], **subplot_kw)
 
+    @check_figures_equal(extensions=["png"])
+    @pytest.mark.parametrize("multi_value", ['BC', tuple('BC')])
+    def test_per_subplot_kw(self, fig_test, fig_ref, multi_value):
+        x = 'AB;CD'
+        grid_axes = fig_test.subplot_mosaic(
+            x,
+            subplot_kw={'facecolor': 'red'},
+            per_subplot_kw={
+                'D': {'facecolor': 'blue'},
+                multi_value: {'facecolor': 'green'},
+            }
+        )
+
+        gs = fig_ref.add_gridspec(2, 2)
+        for color, spec in zip(['red', 'green', 'green', 'blue'], gs):
+            fig_ref.add_subplot(spec, facecolor=color)
+
     def test_string_parser(self):
         normalize = Figure._normalize_grid_string
+
         assert normalize('ABC') == [['A', 'B', 'C']]
         assert normalize('AB;CC') == [['A', 'B'], ['C', 'C']]
         assert normalize('AB;CC;DE') == [['A', 'B'], ['C', 'C'], ['D', 'E']]
@@ -992,6 +1062,25 @@ class TestSubplotMosaic:
                          CC
                          DE
                          """) == [['A', 'B'], ['C', 'C'], ['D', 'E']]
+
+    def test_per_subplot_kw_expander(self):
+        normalize = Figure._norm_per_subplot_kw
+        assert normalize({"A": {}, "B": {}}) == {"A": {}, "B": {}}
+        assert normalize({("A", "B"): {}}) == {"A": {}, "B": {}}
+        with pytest.raises(
+                ValueError, match=f'The key {"B"!r} appears multiple times'
+        ):
+            normalize({("A", "B"): {}, "B": {}})
+        with pytest.raises(
+                ValueError, match=f'The key {"B"!r} appears multiple times'
+        ):
+            normalize({"B": {}, ("A", "B"): {}})
+
+    def test_extra_per_subplot_kw(self):
+        with pytest.raises(
+                ValueError, match=f'The keys {set("B")!r} are in'
+        ):
+            Figure().subplot_mosaic("A", per_subplot_kw={"B": {}})
 
     @check_figures_equal(extensions=["png"])
     @pytest.mark.parametrize("str_pattern",

@@ -22,7 +22,7 @@ from langchain import OpenAI
 #     print('^^^^^^^^^^^PINECONE INDEXES: ',pinecone.list_indexes)
 #     return
 
-os.environ['OPENAI_API_KEY'] = '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'
+openai.api_key = os.environ['OPENAI_KEY']
 from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader, GPTKeywordTableIndex, LLMPredictor, PromptHelper
 
 def import_knowledge(folder):
@@ -63,7 +63,7 @@ def import_vectors(location):
 
 def query(prompt):
     # index = import_vectors('knowledge/civil_code.json')
-    index = import_vectors('code_knowledge/sina_codes.json')
+    index = import_vectors('knowledge/code_knowledge/sina_codes.json')
 
 
 

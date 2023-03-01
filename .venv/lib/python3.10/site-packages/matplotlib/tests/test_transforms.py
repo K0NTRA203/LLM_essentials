@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.transforms as mtransforms
 from matplotlib.path import Path
-from matplotlib.testing.decorators import image_comparison
+from matplotlib.testing.decorators import image_comparison, check_figures_equal
 
 
 def test_non_affine_caching():
@@ -422,7 +422,7 @@ class TestTransformPlotInterface:
         ax = plt.axes()
         offset = mtransforms.Affine2D().translate(10, 10)
         na_offset = NonAffineForTest(mtransforms.Affine2D().translate(10, 10))
-        pth = Path(np.array([[0, 0], [0, 10], [10, 10], [10, 0]]))
+        pth = Path([[0, 0], [0, 10], [10, 10], [10, 0]])
         patch = mpatches.PathPatch(pth,
                                    transform=offset + na_offset + ax.transData)
         ax.add_patch(patch)
@@ -432,7 +432,7 @@ class TestTransformPlotInterface:
     def test_pathc_extents_affine(self):
         ax = plt.axes()
         offset = mtransforms.Affine2D().translate(10, 10)
-        pth = Path(np.array([[0, 0], [0, 10], [10, 10], [10, 0]]))
+        pth = Path([[0, 0], [0, 10], [10, 10], [10, 0]])
         patch = mpatches.PathPatch(pth, transform=offset + ax.transData)
         ax.add_patch(patch)
         expected_data_lim = np.array([[0., 0.], [10.,  10.]]) + 10
@@ -510,7 +510,7 @@ CompositeGenericTransform(
                 Affine2D().scale(1.0),
                 Affine2D().scale(1.0))),
         PolarTransform(
-            PolarAxesSubplot(0.125,0.1;0.775x0.8),
+            PolarAxes(0.125,0.1;0.775x0.8),
             use_rmin=True,
             _apply_theta_transforms=False)),
     CompositeGenericTransform(
@@ -722,3 +722,25 @@ def test_deepcopy():
     b1.translate(3, 4)
     assert not s._invalid
     assert (s.get_matrix() == a.get_matrix()).all()
+
+
+def test_transformwrapper():
+    t = mtransforms.TransformWrapper(mtransforms.Affine2D())
+    with pytest.raises(ValueError, match=(
+            r"The input and output dims of the new child \(1, 1\) "
+            r"do not match those of current child \(2, 2\)")):
+        t.set(scale.LogTransform(10))
+
+
+@check_figures_equal(extensions=["png"])
+def test_scale_swapping(fig_test, fig_ref):
+    np.random.seed(19680801)
+    samples = np.random.normal(size=10)
+    x = np.linspace(-5, 5, 10)
+
+    for fig, log_state in zip([fig_test, fig_ref], [True, False]):
+        ax = fig.subplots()
+        ax.hist(samples, log=log_state, density=True)
+        ax.plot(x, np.exp(-(x**2) / 2) / np.sqrt(2 * np.pi))
+        fig.canvas.draw()
+        ax.set_yscale('linear')

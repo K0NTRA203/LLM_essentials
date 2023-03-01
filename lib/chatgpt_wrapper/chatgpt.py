@@ -104,11 +104,11 @@ class ChatGPT:
         print('askiiiiiiiiiiiiiiiiiiiiiiiiiiinggggggggggggggggggg streeeeeeeeeeeeeeam')
         if self.session is None:
             self.refresh_session()
-        print('TOOOOOOOOOOOOOOOKKKKKEN: ', self.session['accessToken'])
+        print('************************TOKEN*******************: ', self.session['accessToken'])
         new_message_id = str(uuid.uuid4())
         if token != '':
             self.session['accessToken'] = token
-            print('TOOOOOOOOOOOOOOOKKKKKEN: ', self.session['accessToken'])
+            print('************************TOKEN*******************: ', self.session['accessToken'])
         if "accessToken" not in self.session:
             yield (
                 "ERR.\n"

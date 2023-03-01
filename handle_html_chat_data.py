@@ -1,6 +1,11 @@
 import json
 import openai
-openai.api_key = "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"
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+openai.api_key = os.environ['OPENAI_KEY']
 
 # def commit_json_data(location, model='ada', suffix=''):   
 #     with open(location) as f:
@@ -11,6 +16,7 @@ openai.api_key = "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"
 # commit_json_data(location='fine_tune_data/sina_chatgpt2.jsonl',model='davinci',suffix='sina_project')
 # status = openai.FineTune.retrieve(id='ft-h0b8eM40gpt7Pe5755MaJclv')
 # print(status)
+
 def get_jsonl_tokens(path_to_jsonl):
     #open file and read lines
     with open(path_to_jsonl, 'r') as f:

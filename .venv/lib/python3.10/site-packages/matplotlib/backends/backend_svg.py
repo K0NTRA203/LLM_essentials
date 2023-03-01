@@ -801,7 +801,9 @@ class RendererSVG(RendererBase):
 
     def draw_gouraud_triangle(self, gc, points, colors, trans):
         # docstring inherited
+        self._draw_gouraud_triangle(gc, points, colors, trans)
 
+    def _draw_gouraud_triangle(self, gc, points, colors, trans):
         # This uses a method described here:
         #
         #   http://www.svgopen.org/2005/papers/Converting3DFaceToSVG/index.html
@@ -936,7 +938,7 @@ class RendererSVG(RendererBase):
         self.writer.start('g', **self._get_clip_attrs(gc))
         transform = transform.frozen()
         for tri, col in zip(triangles_array, colors_array):
-            self.draw_gouraud_triangle(gc, tri, col, transform)
+            self._draw_gouraud_triangle(gc, tri, col, transform)
         self.writer.end('g')
 
     def option_scale_image(self):
@@ -1048,18 +1050,7 @@ class RendererSVG(RendererBase):
         return char_id.replace("%20", "_")
 
     def _draw_text_as_path(self, gc, x, y, s, prop, angle, ismath, mtext=None):
-        """
-        Draw the text by converting them to paths using the textpath module.
-
-        Parameters
-        ----------
-        s : str
-            text to be converted
-        prop : `matplotlib.font_manager.FontProperties`
-            font property
-        ismath : bool
-            If True, use mathtext parser. If "TeX", use *usetex* mode.
-        """
+        # docstring inherited
         writer = self.writer
 
         writer.comment(s)
@@ -1152,47 +1143,31 @@ class RendererSVG(RendererBase):
             if weight != 400:
                 font_parts.append(f'{weight}')
 
-            def _format_font_name(fn):
-                normalize_names = {
-                    'sans': 'sans-serif',
-                    'sans serif': 'sans-serif'
-                }
-                # A generic font family.  We need to do two things:
-                #  1. list all of the configured fonts with quoted names
-                #  2. append the generic name unquoted
+            def _normalize_sans(name):
+                return 'sans-serif' if name in ['sans', 'sans serif'] else name
+
+            def _expand_family_entry(fn):
+                fn = _normalize_sans(fn)
+                # prepend generic font families with all configured font names
                 if fn in fm.font_family_aliases:
-                    # fix spelling of sans-serif
-                    # we accept 3 ways CSS only supports 1
-                    fn = normalize_names.get(fn, fn)
                     # get all of the font names and fix spelling of sans-serif
-                    # if it comes back
-                    aliases = [
-                        normalize_names.get(_, _) for _ in
-                        fm.FontManager._expand_aliases(fn)
-                    ]
-                    # make sure the generic name appears at least once
-                    # duplicate is OK, next layer will deduplicate
-                    aliases.append(fn)
+                    # (we accept 3 ways CSS only supports 1)
+                    for name in fm.FontManager._expand_aliases(fn):
+                        yield _normalize_sans(name)
+                # whether a generic name or a family name, it must appear at
+                # least once
+                yield fn
 
-                    for a in aliases:
-                        # generic font families must not be quoted
-                        if a in fm.font_family_aliases:
-                            yield a
-                        # specific font families must be quoted
-                        else:
-                            yield repr(a)
-                # specific font families must be quoted
-                else:
-                    yield repr(fn)
-
-            def _get_all_names(prop):
-                for f in prop.get_family():
-                    yield from _format_font_name(f)
+            def _get_all_quoted_names(prop):
+                # only quote specific names, not generic names
+                return [name if name in fm.font_family_aliases else repr(name)
+                        for entry in prop.get_family()
+                        for name in _expand_family_entry(entry)]
 
             font_parts.extend([
                 f'{_short_float_fmt(prop.get_size())}px',
-                # ensure quoting and expansion of font names
-                ", ".join(dict.fromkeys(_get_all_names(prop)))
+                # ensure expansion, quoting, and dedupe of font names
+                ", ".join(dict.fromkeys(_get_all_quoted_names(prop)))
             ])
             style['font'] = ' '.join(font_parts)
             if prop.get_stretch() != 'normal':
@@ -1306,10 +1281,6 @@ class RendererSVG(RendererBase):
 
             writer.end('g')
 
-    def draw_tex(self, gc, x, y, s, prop, angle, *, mtext=None):
-        # docstring inherited
-        self._draw_text_as_path(gc, x, y, s, prop, angle, ismath="TeX")
-
     def draw_text(self, gc, x, y, s, prop, angle, ismath=False, mtext=None):
         # docstring inherited
 
@@ -1352,9 +1323,7 @@ class FigureCanvasSVG(FigureCanvasBase):
 
     fixed_dpi = 72
 
-    @_api.delete_parameter("3.5", "args")
-    def print_svg(self, filename, *args, bbox_inches_restore=None,
-                  metadata=None):
+    def print_svg(self, filename, *, bbox_inches_restore=None, metadata=None):
         """
         Parameters
         ----------
@@ -1400,8 +1369,7 @@ class FigureCanvasSVG(FigureCanvasBase):
             self.figure.draw(renderer)
             renderer.finalize()
 
-    @_api.delete_parameter("3.5", "args")
-    def print_svgz(self, filename, *args, **kwargs):
+    def print_svgz(self, filename, **kwargs):
         with cbook.open_file_cm(filename, "wb") as fh, \
                 gzip.GzipFile(mode='w', fileobj=fh) as gzipwriter:
             return self.print_svg(gzipwriter, **kwargs)

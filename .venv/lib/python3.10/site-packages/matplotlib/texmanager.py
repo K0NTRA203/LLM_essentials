@@ -100,11 +100,6 @@ class TexManager:
         'computer modern typewriter': 'monospace',
     }
 
-    grey_arrayd = _api.deprecate_privatize_attribute("3.5")
-    font_family = _api.deprecate_privatize_attribute("3.5")
-    font_families = _api.deprecate_privatize_attribute("3.5")
-    font_info = _api.deprecate_privatize_attribute("3.5")
-
     @functools.lru_cache()  # Always return the same instance.
     def __new__(cls):
         Path(cls.texcache).mkdir(parents=True, exist_ok=True)
@@ -181,8 +176,15 @@ class TexManager:
         Return a filename based on a hash of the string, fontsize, and dpi.
         """
         src = cls._get_tex_source(tex, fontsize) + str(dpi)
-        return os.path.join(
-            cls.texcache, hashlib.md5(src.encode('utf-8')).hexdigest())
+        filehash = hashlib.md5(src.encode('utf-8')).hexdigest()
+        filepath = Path(cls.texcache)
+
+        num_letters, num_levels = 2, 2
+        for i in range(0, num_letters*num_levels, num_letters):
+            filepath = filepath / Path(filehash[i:i+2])
+
+        filepath.mkdir(parents=True, exist_ok=True)
+        return os.path.join(filepath, filehash)
 
     @classmethod
     def get_font_preamble(cls):
@@ -290,12 +292,16 @@ class TexManager:
             # and thus replace() works atomically.  It also allows referring to
             # the texfile with a relative path (for pathological MPLCONFIGDIRs,
             # the absolute path may contain characters (e.g. ~) that TeX does
-            # not support.)
-            with TemporaryDirectory(dir=Path(dvifile).parent) as tmpdir:
+            # not support; n.b. relative paths cannot traverse parents, or it
+            # will be blocked when `openin_any = p` in texmf.cnf).
+            cwd = Path(dvifile).parent
+            with TemporaryDirectory(dir=cwd) as tmpdir:
+                tmppath = Path(tmpdir)
                 cls._run_checked_subprocess(
                     ["latex", "-interaction=nonstopmode", "--halt-on-error",
-                     f"../{texfile.name}"], tex, cwd=tmpdir)
-                (Path(tmpdir) / Path(dvifile).name).replace(dvifile)
+                     f"--output-directory={tmppath.name}",
+                     f"{texfile.name}"], tex, cwd=cwd)
+                (tmppath / Path(dvifile).name).replace(dvifile)
         return dvifile
 
     @classmethod

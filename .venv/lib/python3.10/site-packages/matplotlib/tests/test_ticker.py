@@ -1,6 +1,7 @@
 from contextlib import nullcontext
 import itertools
 import locale
+import logging
 import re
 
 import numpy as np
@@ -206,6 +207,15 @@ class TestLogLocator:
         loc = mticker.LogLocator(base=2)
         test_value = np.array([0.5, 1., 2., 4., 8., 16., 32., 64., 128., 256.])
         assert_almost_equal(loc.tick_values(1, 100), test_value)
+
+    def test_polar_axes(self):
+        """
+        Polar axes have a different ticking logic.
+        """
+        fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+        ax.set_yscale('log')
+        ax.set_ylim(1, 100)
+        assert_array_equal(ax.get_yticks(), [10, 100, 1000])
 
     def test_switch_to_autolocator(self):
         loc = mticker.LogLocator(subs="all")
@@ -724,6 +734,24 @@ class TestScalarFormatter:
             fig, ax = plt.subplots()
             ax.set_xticks([-1, 0, 1])
             fig.canvas.draw()
+
+    def test_cmr10_substitutions(self, caplog):
+        mpl.rcParams.update({
+            'font.family': 'cmr10',
+            'mathtext.fontset': 'cm',
+            'axes.formatter.use_mathtext': True,
+        })
+
+        # Test that it does not log a warning about missing glyphs.
+        with caplog.at_level(logging.WARNING, logger='matplotlib.mathtext'):
+            fig, ax = plt.subplots()
+            ax.plot([-0.03, 0.05], [40, 0.05])
+            ax.set_yscale('log')
+            yticks = [0.02, 0.3, 4, 50]
+            formatter = mticker.LogFormatterSciNotation()
+            ax.set_yticks(yticks, map(formatter, yticks))
+            fig.canvas.draw()
+            assert not caplog.text
 
     def test_empty_locs(self):
         sf = mticker.ScalarFormatter()

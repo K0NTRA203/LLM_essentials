@@ -162,6 +162,8 @@ def check_shape(_shape, **kwargs):
                                     if n is not None
                                     else next(dim_labels)
                                     for n in target_shape))
+            if len(target_shape) == 1:
+                text_shape += ","
 
             raise ValueError(
                 f"{k!r} must be {len(target_shape)}D "
@@ -332,6 +334,29 @@ def select_matching_signature(funcs, *args, **kwargs):
         except TypeError:
             if i == len(funcs) - 1:
                 raise
+
+
+def nargs_error(name, takes, given):
+    """Generate a TypeError to be raised by function calls with wrong arity."""
+    return TypeError(f"{name}() takes {takes} positional arguments but "
+                     f"{given} were given")
+
+
+def kwarg_error(name, kw):
+    """
+    Generate a TypeError to be raised by function calls with wrong kwarg.
+
+    Parameters
+    ----------
+    name : str
+        The name of the calling function.
+    kw : str or Iterable[str]
+        Either the invalid keyword argument name, or an iterable yielding
+        invalid keyword arguments (e.g., a ``kwargs`` dict).
+    """
+    if not isinstance(kw, str):
+        kw = next(iter(kw))
+    return TypeError(f"{name}() got an unexpected keyword argument '{kw}'")
 
 
 def recursive_subclasses(cls):

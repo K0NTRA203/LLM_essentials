@@ -30,6 +30,13 @@ def test_create_lookup_table(N, result):
     assert_array_almost_equal(mcolors._create_lookup_table(N, data), result)
 
 
+@pytest.mark.parametrize("dtype", [np.uint8, int, np.float16, float])
+def test_index_dtype(dtype):
+    # We use subtraction in the indexing, so need to verify that uint8 works
+    cm = mpl.colormaps["viridis"]
+    assert_array_equal(cm(dtype(0)), cm(0))
+
+
 def test_resampled():
     """
     GitHub issue #6025 pointed to incorrect ListedColormap.resampled;
@@ -68,7 +75,7 @@ def test_register_cmap():
     new_cm = mpl.colormaps["viridis"]
     target = "viridis2"
     with pytest.warns(
-            PendingDeprecationWarning,
+            mpl.MatplotlibDeprecationWarning,
             match=r"matplotlib\.colormaps\.register\(name\)"
     ):
         cm.register_cmap(target, new_cm)
@@ -77,25 +84,25 @@ def test_register_cmap():
     with pytest.raises(ValueError,
                        match="Arguments must include a name or a Colormap"):
         with pytest.warns(
-            PendingDeprecationWarning,
+            mpl.MatplotlibDeprecationWarning,
             match=r"matplotlib\.colormaps\.register\(name\)"
         ):
             cm.register_cmap()
 
     with pytest.warns(
-            PendingDeprecationWarning,
+            mpl.MatplotlibDeprecationWarning,
             match=r"matplotlib\.colormaps\.unregister\(name\)"
     ):
         cm.unregister_cmap(target)
     with pytest.raises(ValueError,
                        match=f'{target!r} is not a valid value for name;'):
         with pytest.warns(
-                PendingDeprecationWarning,
+                mpl.MatplotlibDeprecationWarning,
                 match=r"matplotlib\.colormaps\[name\]"
         ):
             cm.get_cmap(target)
     with pytest.warns(
-            PendingDeprecationWarning,
+            mpl.MatplotlibDeprecationWarning,
             match=r"matplotlib\.colormaps\.unregister\(name\)"
     ):
         # test that second time is error free
@@ -103,7 +110,7 @@ def test_register_cmap():
 
     with pytest.raises(TypeError, match="'cmap' must be"):
         with pytest.warns(
-            PendingDeprecationWarning,
+            mpl.MatplotlibDeprecationWarning,
             match=r"matplotlib\.colormaps\.register\(name\)"
         ):
             cm.register_cmap('nome', cmap='not a cmap')
@@ -137,7 +144,7 @@ def test_double_register_builtin_cmap():
             mpl.colormaps[name], name=name, force=True
         )
     with pytest.raises(ValueError, match='A colormap named "viridis"'):
-        with pytest.warns(PendingDeprecationWarning):
+        with pytest.warns(mpl.MatplotlibDeprecationWarning):
             cm.register_cmap(name, mpl.colormaps[name])
     with pytest.warns(UserWarning):
         # TODO is warning more than once!
@@ -148,7 +155,7 @@ def test_unregister_builtin_cmap():
     name = "viridis"
     match = f'cannot unregister {name!r} which is a builtin colormap.'
     with pytest.raises(ValueError, match=match):
-        with pytest.warns(PendingDeprecationWarning):
+        with pytest.warns(mpl.MatplotlibDeprecationWarning):
             cm.unregister_cmap(name)
 
 
@@ -243,7 +250,7 @@ def test_colormap_invalid():
     # Test scalar representations
     assert_array_equal(cmap(-np.inf), cmap(0))
     assert_array_equal(cmap(np.inf), cmap(1.0))
-    assert_array_equal(cmap(np.nan), np.array([0., 0., 0., 0.]))
+    assert_array_equal(cmap(np.nan), [0., 0., 0., 0.])
 
 
 def test_colormap_return_types():
@@ -485,11 +492,25 @@ def test_CenteredNorm():
     norm(np.linspace(-1.0, 0.0, 10))
     assert norm.vmax == 1.0
     assert norm.halfrange == 1.0
-    # set vcenter to 1, which should double halfrange
+    # set vcenter to 1, which should move the center but leave the
+    # halfrange unchanged
     norm.vcenter = 1
-    assert norm.vmin == -1.0
-    assert norm.vmax == 3.0
-    assert norm.halfrange == 2.0
+    assert norm.vmin == 0
+    assert norm.vmax == 2
+    assert norm.halfrange == 1
+
+    # Check setting vmin directly updates the halfrange and vmax, but
+    # leaves vcenter alone
+    norm.vmin = -1
+    assert norm.halfrange == 2
+    assert norm.vmax == 3
+    assert norm.vcenter == 1
+
+    # also check vmax updates
+    norm.vmax = 2
+    assert norm.halfrange == 1
+    assert norm.vmin == 0
+    assert norm.vcenter == 1
 
 
 @pytest.mark.parametrize("vmin,vmax", [[-1, 2], [3, 1]])
@@ -574,7 +595,7 @@ def test_Normalize():
     # i.e. 127-(-128) here).
     vals = np.array([-128, 127], dtype=np.int8)
     norm = mcolors.Normalize(vals.min(), vals.max())
-    assert_array_equal(np.asarray(norm(vals)), [0, 1])
+    assert_array_equal(norm(vals), [0, 1])
 
     # Don't lose precision on longdoubles (float128 on Linux):
     # for array inputs...
@@ -1471,6 +1492,11 @@ def test_norm_callback():
     assert increment.call_count == 2
     norm.vmax = 5
     assert increment.call_count == 2
+
+    # We only want autoscale() calls to send out one update signal
+    increment.call_count = 0
+    norm.autoscale([0, 1, 2])
+    assert increment.call_count == 1
 
 
 def test_scalarmappable_norm_update():

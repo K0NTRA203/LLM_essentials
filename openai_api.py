@@ -1,51 +1,27 @@
 import sqlite3
 import openai
 import json
-from chatgpt_wrapper import ChatGPT
-import chatgpt_wrapper
-
-
-# print('lissssst')
-# print(openai.Model.list())
-
-def asking(conversation_id, parent_message_id, user_prompt, token=''):
-    #asking for response:
-    print('~~~porside shod~~~')
-    bot = ChatGPT()
-    if conversation_id != '':
-        bot.conversation_id = conversation_id
-        bot.parent_message_id = parent_message_id
-    
-    if token =='':
-        response = bot.ask(user_prompt)
-    else: 
-        response = bot.ask(user_prompt,token)
-    conversation_id = bot.conversation_id
-
-    #closing browser tasks:
-    for page in bot.browser.pages:
-        print('~~~dar hale bastan~~~')
-        page.close()
-       
-        
-    #returning data back
-    return response,bot.conversation_id, bot.parent_message_id
+# from chatgpt_wrapper import ChatGPT
+# import chatgpt_wrapper
+import os
+from dotenv import load_dotenv
+load_dotenv()
+openai_key = os.environ['OPENAI_KEY']
 
 def playground(name, engine, prompt, max_tokens, n, stop, temperature,tick=False):
     print('name', name)
     print('prompt', prompt)
     print('engine', engine)
-    openai.api_key = "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"
-    print('api: ', openai.api_key)
+    openai.api_key = openai_key
     response = openai.Completion.create(
         engine=engine,
         prompt=prompt,
-        max_tokens=int(max_tokens),
-        n=int(n),
+        
+        max_tokens=int(max_tokens) if max_tokens is not None else 100,
+        n=int(n) if n is not None else 1,
         stop=stop,
         temperature=temperature
     )
-    print(response)
     def response_to_db(name, response, engine, prompt):
         conn = sqlite3.connect('database.db')
         c = conn.cursor()

@@ -264,7 +264,12 @@ def _pytest_image_comparison(baseline_images, extensions, tol,
                 kwargs['request'] = request
 
             if extension not in comparable_formats():
-                pytest.skip(f"Cannot compare {extension} files on this system")
+                reason = {
+                    'pdf': 'because Ghostscript is not installed',
+                    'eps': 'because Ghostscript is not installed',
+                    'svg': 'because Inkscape is not installed',
+                }.get(extension, 'on this system')
+                pytest.skip(f"Cannot compare {extension} files {reason}")
 
             img = _ImageComparisonBase(func, tol=tol, remove_text=remove_text,
                                        savefig_kwargs=savefig_kwargs)
@@ -448,7 +453,7 @@ def check_figures_equal(*, extensions=("png", "pdf", "svg"), tol=0):
 
         if not {"fig_test", "fig_ref"}.issubset(old_sig.parameters):
             raise ValueError("The decorated function must have at least the "
-                             "parameters 'fig_ref' and 'fig_test', but your "
+                             "parameters 'fig_test' and 'fig_ref', but your "
                              f"function has the signature {old_sig}")
 
         @pytest.mark.parametrize("ext", extensions)

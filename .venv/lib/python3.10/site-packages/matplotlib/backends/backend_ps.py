@@ -7,6 +7,7 @@ import datetime
 from enum import Enum
 import functools
 from io import StringIO
+import itertools
 import logging
 import os
 import pathlib
@@ -38,12 +39,17 @@ _log = logging.getLogger(__name__)
 debugPS = False
 
 
+@_api.deprecated("3.7")
 class PsBackendHelper:
     def __init__(self):
         self._cached = {}
 
 
-ps_backend_helper = PsBackendHelper()
+@_api.caching_module_getattr
+class __getattr__:
+    # module-level deprecations
+    ps_backend_helper = _api.deprecated("3.7", obj_type="")(
+        property(lambda self: PsBackendHelper()))
 
 
 papersize = {'letter': (8.5, 11),
@@ -625,13 +631,15 @@ grestore
         if ismath:
             return self.draw_mathtext(gc, x, y, s, prop, angle)
 
+        stream = []  # list of (ps_name, x, char_name)
+
         if mpl.rcParams['ps.useafm']:
             font = self._get_font_afm(prop)
+            ps_name = (font.postscript_name.encode("ascii", "replace")
+                        .decode("ascii"))
             scale = 0.001 * prop.get_size_in_points()
-            stream = []
             thisx = 0
             last_name = None  # kerns returns 0 for None.
-            xs_names = []
             for c in s:
                 name = uni2type1.get(ord(c), f"uni{ord(c):04X}")
                 try:
@@ -642,38 +650,24 @@ grestore
                 kern = font.get_kern_dist_from_name(last_name, name)
                 last_name = name
                 thisx += kern * scale
-                xs_names.append((thisx, name))
+                stream.append((ps_name, thisx, name))
                 thisx += width * scale
-            ps_name = (font.postscript_name
-                       .encode("ascii", "replace").decode("ascii"))
-            stream.append((ps_name, xs_names))
 
         else:
             font = self._get_font_ttf(prop)
             self._character_tracker.track(font, s)
-            stream = []
-            prev_font = curr_stream = None
             for item in _text_helpers.layout(s, font):
                 ps_name = (item.ft_object.postscript_name
                            .encode("ascii", "replace").decode("ascii"))
-                if item.ft_object is not prev_font:
-                    if curr_stream:
-                        stream.append(curr_stream)
-                    prev_font = item.ft_object
-                    curr_stream = [ps_name, []]
-                curr_stream[1].append(
-                    (item.x, item.ft_object.get_glyph_name(item.glyph_idx))
-                )
-            # append the last entry if exists
-            if curr_stream:
-                stream.append(curr_stream)
-
+                glyph_name = item.ft_object.get_glyph_name(item.glyph_idx)
+                stream.append((ps_name, item.x, glyph_name))
         self.set_color(*gc.get_rgb())
 
-        for ps_name, xs_names in stream:
+        for ps_name, group in itertools. \
+                groupby(stream, lambda entry: entry[0]):
             self.set_font(ps_name, prop.get_size_in_points(), False)
             thetext = "\n".join(f"{x:g} 0 m /{name:s} glyphshow"
-                                for x, name in xs_names)
+                                for _, x, name in group)
             self._pswriter.write(f"""\
 gsave
 {self._get_clip_cmd(gc)}
@@ -828,11 +822,10 @@ class FigureCanvasPS(FigureCanvasBase):
     def get_default_filetype(self):
         return 'ps'
 
-    @_api.delete_parameter("3.5", "args")
     def _print_ps(
-            self, fmt, outfile, *args,
+            self, fmt, outfile, *,
             metadata=None, papertype=None, orientation='portrait',
-            **kwargs):
+            bbox_inches_restore=None, **kwargs):
 
         dpi = self.figure.dpi
         self.figure.dpi = 72  # Override the dpi kwarg
@@ -867,7 +860,8 @@ class FigureCanvasPS(FigureCanvasBase):
                    if mpl.rcParams['text.usetex'] else
                    self._print_figure)
         printer(fmt, outfile, dpi=dpi, dsc_comments=dsc_comments,
-                orientation=orientation, papertype=papertype, **kwargs)
+                orientation=orientation, papertype=papertype,
+                bbox_inches_restore=bbox_inches_restore, **kwargs)
 
     def _print_figure(
             self, fmt, outfile, *,
@@ -877,7 +871,7 @@ class FigureCanvasPS(FigureCanvasBase):
         Render the figure to a filesystem path or a file-like object.
 
         Parameters are as for `.print_figure`, except that *dsc_comments* is a
-        all string containing Document Structuring Convention comments,
+        string containing Document Structuring Convention comments,
         generated from the *metadata* parameter to `.print_figure`.
         """
         is_eps = fmt == 'eps'
@@ -1194,7 +1188,7 @@ def gs_distill(tmpfile, eps=False, ptype='letter', bbox=None, rotated=False):
     # the original bbox can be restored during the pstoeps step.
 
     if eps:
-        # For some versions of gs, above steps result in an ps file where the
+        # For some versions of gs, above steps result in a ps file where the
         # original bbox is no more correct. Do not adjust bbox for now.
         pstoeps(tmpfile, bbox, rotated=rotated)
 

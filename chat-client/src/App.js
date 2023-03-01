@@ -4,6 +4,7 @@ import Porm from './Form';
 import ServerResponse from './ServerResponse';
 import { useHandleConversationNameChange } from './handleConversationNameChange';
 import Playground from './Playground';
+import Embedding from './Embedding.js';
 import { Button,Layout,theme, ConfigProvider} from 'antd';
 import { Content, Footer } from 'antd/es/layout/layout';
 
@@ -58,11 +59,14 @@ const App = () => {
     </div>
     <Layout>
     {page === 'playground' && <Playground />}
+    {page === 'embedding' && <Embedding />}
+
     <Footer style={{ marginUp: '20px'}}>
     
     
         <Button onClick={() => handlePageChange('conversation')}>Chat page</Button>
         <Button onClick={() => handlePageChange('playground')}>Playground page</Button>
+        <Button onClick={() => handlePageChange('embedding')}>Embedding page</Button>
         
     </Footer>
     </Layout>

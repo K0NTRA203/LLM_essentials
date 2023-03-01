@@ -35,7 +35,6 @@ class GeoAxes(Axes):
         # Do not register xaxis or yaxis with spines -- as done in
         # Axes._init_axis() -- until GeoAxes.xaxis.clear() works.
         # self.spines['geo'].register_axis(self.yaxis)
-        self._update_transScale()
 
     def clear(self):
         # docstring inherited
@@ -199,17 +198,17 @@ class GeoAxes(Axes):
 
     def can_zoom(self):
         """
-        Return whether this axes supports the zoom box button functionality.
+        Return whether this Axes supports the zoom box button functionality.
 
-        This axes object does not support interactive zoom box.
+        This Axes object does not support interactive zoom box.
         """
         return False
 
     def can_pan(self):
         """
-        Return whether this axes supports the pan/zoom button functionality.
+        Return whether this Axes supports the pan/zoom button functionality.
 
-        This axes object does not support interactive pan/zoom.
+        This Axes object does not support interactive pan/zoom.
         """
         return False
 
