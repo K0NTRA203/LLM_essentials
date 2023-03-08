@@ -8,6 +8,67 @@ from dotenv import load_dotenv
 load_dotenv()
 openai_key = os.environ['OPENAI_KEY']
 
+# def make_gptapi_history(system_str, prompts, responses):
+#     messages = []
+#     messages.append({"role": "system", "content": system_str})
+#     for i in range(len(prompts)):
+#         messages.append({"role": "user", "content": prompts[i]})
+#         messages.append({"role": "assistant", "content": responses[i]})
+#     return messages
+
+def _make_gptapi_history(system_str, name, x):
+    # call the function
+    conversation_history = pg_history_from_db(name, x)
+    # create two empty lists
+    prompts = []
+    responses = []
+    # iterate through the conversation_history and append values to each list
+    for conversation in conversation_history:
+        prompts.append(conversation['prompt'])
+        responses.append(conversation['best_choice_text'])
+
+    messages = []
+    if system_str != '':
+        messages.append({"role": "system", "content": system_str})
+    for i in range(len(prompts)):
+        messages.append({"role": "user", "content": prompts[i]})
+        messages.append({"role": "assistant", "content": responses[i]})
+    return messages
+
+
+def gpt_api(name, x, system_str , msg_content):
+
+
+    history = _make_gptapi_history(system_str, name, x)
+    current_message= [{"role": "user", "content": msg_content}]
+    history.extend(current_message)
+    print('x= ', x, '******MSG_CONTENT******', history)
+    completion = openai.ChatCompletion.create(
+        model='gpt-3.5-turbo',
+        # messages=all_messages
+        messages=history
+    )
+    print(completion)
+    msg = completion['choices'][0]['message']['content']
+    print(msg)
+    return msg
+
+def pg_history_from_db(name,x):
+     #open connection to database
+    db = sqlite3.connect('database.db')
+    cursor = db.cursor()
+    # get conversation_messages from database
+    if x != None:
+        cursor.execute("SELECT prompt, best_choice_text FROM playground WHERE name = ? ORDER BY time DESC LIMIT ?", (name, x))
+    res = cursor.fetchall()
+    conversation_messages = []
+    for row in res:
+        conversation_messages.insert(0, {"prompt": row[0], "best_choice_text": row[1]})  
+    db.close()
+    print('PG MESSAGES', conversation_messages)
+    return conversation_messages
+
+
 def playground(name, engine, prompt, max_tokens, n, stop, temperature,tick=False):
     print('name', name)
     print('prompt', prompt)

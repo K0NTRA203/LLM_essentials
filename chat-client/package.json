@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "ace-builds": "^1.15.3",
     "antd": "^5.1.4",
     "codemirror": "^6.0.1",
     "css-loader": "^6.7.3",
     "nes.css": "^2.3.0",
+    "react-ace": "^10.1.0",
     "react-dom": "^18.2.0",
     "react-redux": "^8.0.5",
     "react-router-dom": "^6.6.2",
@@ -42,5 +44,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@babel/parser": "^7.21.2",
+    "prettier": "^2.8.4"
   }
 }

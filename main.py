@@ -8,6 +8,8 @@ from revChatGPT.V1 import Chatbot
 from engines import query_engines, query_gpt
 import os
 from dotenv import load_dotenv
+from openai_api import pg_history_from_db
+
 load_dotenv()
     
 app = Flask(__name__)
@@ -45,19 +47,8 @@ def playground_route():
 def playground_messages():
     name = request.args.get('name')
     x = request.args.get('x')
-    print('NAME O X: ',name,x)
-    #open connection to database
-    db = sqlite3.connect('database.db')
-    cursor = db.cursor()
-    # get conversation_messages from database
-    if x != None:
-        cursor.execute("SELECT prompt, best_choice_text FROM playground WHERE name = ? ORDER BY time DESC LIMIT ?", (name, x))
-    res = cursor.fetchall()
-    conversation_messages = []
-    for row in res:
-        conversation_messages.insert(0, {"prompt": row[0], "best_choice_text": row[1]})  
-    db.close()
-    print(conversation_messages)
+    print('NAME and X: ',name,x)
+    conversation_messages = pg_history_from_db(name,x)
     resp =  make_response(jsonify({"messages": conversation_messages}))
     resp.headers['Access-Control-Allow-Origin'] = '*'
     resp.headers['Access-Control-Allow-Methods'] = 'GET'
@@ -137,7 +128,7 @@ def delete_conversation():
 def gpt_history():
     name = request.args.get('name')
     x = request.args.get('x')
-    print('NAME O X: ',name,x)
+    print('NAME and X: ',name,x)
     #open connection to database
     db = sqlite3.connect('database.db')
     cursor = db.cursor()

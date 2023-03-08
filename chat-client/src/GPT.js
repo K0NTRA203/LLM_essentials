@@ -1,38 +1,29 @@
 import React, {useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { render } from "react-dom";
-import { Typography,Switch, Checkbox, Form, Modal, Layout, Menu, Input, Slider, Card, Button, Space, ConfigProvider,theme } from 'antd';
-import {
-  DeleteRowOutlined
-} from '@ant-design/icons';
+import { Checkbox, Form, Modal, Layout, Menu, Input, Slider, Card, Button, Space, ConfigProvider,theme } from 'antd';
+import {DeleteRowOutlined} from '@ant-design/icons';
 import AceEditor from "react-ace";
 import "ace-builds/src-noconflict/theme-terminal";
 import "ace-builds/src-noconflict/mode-python";
 
 const { Content, Sider } = Layout;
 const { TextArea } = Input;
-const { Text } = Typography;
-
-
-const Playground = (props) => {
+const GPT = (props) => {
   const { handlePageChange } = props;
-
   const [engine, setEngine] = useState('gpt-3.5-turbo');
   const [maxTokens, setMaxTokens] = useState(10);
   const [n, setN] = useState(1);
   const [stop, setStop] = useState('');
   const [temp, setTemp] = useState(0.5);
-  const [histSlider, setHistSlider] = useState(0);
-  const [includeHistory, setIncludeHistory] = useState(false);
-  const [system, setSystem] = useState('');
-
-
-  const [history, setHistory] = useState('0');
+  const [history, setHistory] = useState('1');
   const [result, setResult] = useState('');
   const [prompt, setPrompt] = useState('');
   const [names, setNames] = useState([]);
   const [messages, setMessages] = useState([]);
   const [tick, setTick] = useState(false);
+  const [removeLast, setRemoveLast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [start, setStart] = useState('');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [isRendered, setIsRendered] = useState(false);
@@ -44,30 +35,12 @@ const Playground = (props) => {
   const [cards,setCards] = useState([]);
   const [lastResult, setLastResult] = useState('sss');
   const [lastQuery,setLastQuery] = useState('');
-  
 
 
   const prettier = require("prettier");
   const tsParser = require("prettier/parser-typescript");
-  
-  function makeVariableNamesColored(str) {
-    const regex = /`([^`]+)`/g; // regex to match name within backticks
-    const parts = str.split(regex); // split string by name
-  
-    // map parts array to elements with name in <Text> component
-    const elements = parts.map((part, i) => {
-      if (part.match(regex)) {
-        // name found
-        return <Text key={i} type="success">{part.slice(1, -1)}</Text>;
-      } else {
-        // plain text
-        return <span key={i}>{part}</span>;
-      }
-    });
-  
-    // join elements together and return
-    return <>{elements}</>;
-  }
+
+
 
   // Scrolling inside the card for every msg update
   function TypewriterText({ text, setIsRendered, cardRef }) {
@@ -175,7 +148,6 @@ const Playground = (props) => {
     console.log("change", newValue);
   }
   
-  
 
 
   const renderAceEditor = (content) => {
@@ -214,8 +186,6 @@ const Playground = (props) => {
   function onChange(newValue) {
     console.log("change", newValue);
     setPrompt(newValue);
-    console.log(histSlider)
-    console.log(includeHistory)
     
   }
 
@@ -333,8 +303,6 @@ useLayoutEffect(() => {
           stop: stop,
           temp: temp,
           tick: tick,
-          hist: histSlider,
-          system: system,
         })
       }),
       timeout(1500000)
@@ -367,7 +335,6 @@ useLayoutEffect(() => {
   }
 
 return (
-<html style={{ height: '100%' }}>
   <ConfigProvider
   style={{fontFamily:'monospace'}}
   theme={{
@@ -380,7 +347,7 @@ return (
   <Layout>   
      
   <Sider style={{ marginRight: '20px', marginBottom: '20px' }}>
-  <Menu style={{ backgroundColor:'black', fontFamily:'monospace', fontWeight: 700}}>
+  <Menu style={{ fontFamily:'monospace', fontWeight: 700}}>
 
         <img
             src= "https://web.archive.org/web/20090903074751im_/http://geocities.com/Area51/Corridor/4492/scale.gif"
@@ -474,8 +441,8 @@ return (
     </Space> 
   </Form>
 </Content>
-<Sider style={{ marginLeft: '20px', fontFamily:'monospace' }} >
-        <form style={{padding:'7px'}} onSubmit={handleSubmit}>
+<Sider style={{ marginLeft: '20px' }}>
+        <form onSubmit={handleSubmit}>
           <label>
             Engine:
             <select value={engine} onChange={e => setEngine(e.target.value)}>
@@ -516,11 +483,10 @@ return (
               maxLength={5}
             />
           </label>
-          <br/> <br/>
+          <br />
           <label>
             Temperature:
-            <Slider 
-              // style={{backgroundColor: '#e8dcec'}}
+            <Slider style={{backgroundColor: '#e8dcec'}}
               value={temp}
               onChange={setTemp}
               min={0}
@@ -528,9 +494,9 @@ return (
               step={0.1}
             />
           </label>
-          <br/> <br/>
+          <br />
           <label>
-            Displaying History:
+            History:
             <Input
               type="number"
               value={history}
@@ -538,37 +504,6 @@ return (
               min={1}
               max={10}
           />
-          <br/> <br/>
-          <Switch 
-              size="small" 
-              checked={includeHistory} 
-              onChange={() => {
-                        setIncludeHistory(!includeHistory);
-                        setHistSlider(0);
-                        if (!includeHistory) {
-                          
-                          console.log(histSlider)
-                        }
-              }}>
-            </Switch> 
-     
-            Remember History
-          {includeHistory && (
-            <Slider 
-              value={histSlider}
-              onChange={setHistSlider}
-              min={0}
-              max={20}
-              step={1}
-            />
-          )}
-                    <br/><br/>
-            Role:
-            <TextArea value={system} 
-                    placeholder="You are a helpful agent"
-                    autoSize={{ minRows: 3, maxRows: 5 }}
-                    onChange={e => setSystem(e.target.value)} />
-
           </label>
           <br />
         </form>
@@ -578,8 +513,7 @@ return (
       
     </Layout>
     </ConfigProvider>
-    </html>
   );
 };
-export default Playground;
+export default GPT;
 

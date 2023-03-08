@@ -8,7 +8,8 @@ import { blue } from '@ant-design/colors';
 
 const { Content, Sider } = Layout;
 const { TextArea } = Input;
-const Form = () => {
+const FForm = (props) => {
+  const { handlePageChange } = props;
   const [history, setHistory] = useState('1');
   const [result, setResult] = useState('');
   const [prompt, setPrompt] = useState('');
@@ -268,4 +269,4 @@ return (
     </ConfigProvider>
   );
 };
-export default Form;
+export default FForm;

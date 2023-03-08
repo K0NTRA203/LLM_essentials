@@ -1,6 +1,7 @@
 
-from openai_api import playground
+from openai_api import playground, gpt_api
 from embedding import response_to_db,translate_prompt
+import openai
 import embedding
 import embed
 import sqlite3
@@ -16,13 +17,22 @@ def query_engines(data):
         stop = data['stop']
         temperature = data['temp']
         tick = data['tick']
+        hist = data['hist']
+        system = data['system']
+        
 
         print('*******RECIEVED PROMPT********', prompt)
-        if engine != 'davinci-qanoon-fa' and engine != 'davinci-qanoon-en' and engine != 'davinci-sina' and engine != 'labour-law' and engine != 'labour-law-fa':
+        if engine != 'davinci-qanoon-fa' and engine != 'davinci-qanoon-en' and engine != 'davinci-sina' and engine != 'labour-law' and engine != 'labour-law-fa'and engine != 'gpt-3.5-turbo':
             response = playground(name,engine,prompt,max_tokens,n,stop,temperature)
             return response
         
-        elif engine == 'davinci-qanoon-fa':
+        elif engine == 'gpt-3.5-turbo':
+            
+            response = gpt_api(name,hist,system,prompt)
+            response_to_db(name,str(response), 'gpt-3.5-turbo', prompt)
+            return response
+        
+        elif engine == 'davinci-qanoon-fa': 
             translated_prompt = translate_prompt(prompt,'en')
             print('TRANSLATED TO: ',translated_prompt)
             response = embedding.query(translated_prompt)
