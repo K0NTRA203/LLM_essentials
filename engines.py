@@ -1,5 +1,5 @@
 
-from openai_api import playground, gpt_api
+from openai_api import playground, gpt_api, gpt_stream
 from embedding import response_to_db,translate_prompt
 import openai
 import embedding
@@ -104,3 +104,16 @@ def query_gpt(bot,conversation_name, conversation_id='', parent_message_id='', u
         db.commit()
         db.close()
         yield 'data: DONEDONE\n\n'
+
+def query_gpt_api_stream(name, prompt, included_hist, system):
+    for data in gpt_stream(name, prompt, included_hist, system):
+        print(data)
+        yield data
+    
+          
+
+
+        
+  
+
+

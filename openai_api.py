@@ -1,20 +1,13 @@
 import sqlite3
 import openai
-import json
-# from chatgpt_wrapper import ChatGPT
-# import chatgpt_wrapper
 import os
+import time
 from dotenv import load_dotenv
 load_dotenv()
 openai_key = os.environ['OPENAI_KEY']
 
-# def make_gptapi_history(system_str, prompts, responses):
-#     messages = []
-#     messages.append({"role": "system", "content": system_str})
-#     for i in range(len(prompts)):
-#         messages.append({"role": "user", "content": prompts[i]})
-#         messages.append({"role": "assistant", "content": responses[i]})
-#     return messages
+
+
 
 def _make_gptapi_history(system_str, name, x):
     # call the function
@@ -47,6 +40,7 @@ def gpt_api(name, x, system_str , msg_content):
         model='gpt-3.5-turbo',
         # messages=all_messages
         messages=history
+        
     )
     print(completion)
     msg = completion['choices'][0]['message']['content']
@@ -109,3 +103,43 @@ def playground(name, engine, prompt, max_tokens, n, stop, temperature,tick=False
     response_to_db(name, response, engine, prompt)
 
     return response.choices[0]['text']
+
+def gpt_stream(name, msg_content, included_hist, system):
+    full_msg = ''
+    history = _make_gptapi_history(system, name, included_hist)
+    current_message= [{"role": "user", "content": msg_content}]
+    history.extend(current_message)
+    print(f"history{history}")
+
+    for completion in openai.ChatCompletion.create(
+        model='gpt-3.5-turbo',
+        messages=current_message,
+        stream=True
+    ):
+        reason = completion['choices'][0]['finish_reason']
+        if reason != None: 
+            # WHEN FINISHED
+
+            yield f"data: [DONE]\n\n"
+            # DB COMMIT SHOULD BE CHANGED LATER
+
+                
+
+        if 'delta' in completion['choices'][0]:
+            if 'content' in completion['choices'][0]['delta']:
+                msg = completion['choices'][0]['delta']['content']
+                full_msg = full_msg + msg
+
+                msg = msg.replace('\n','~~~')
+                yield f"data: {msg}\n\n"
+    unix_time = int(time.time())
+    print(unix_time)
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    print('tryin to save db', full_msg)
+    c.execute("CREATE TABLE IF NOT EXISTS playground(id TEXT, name TEXT, model TEXT, prompt TEXT, all_choices TEXT, best_choice_text TEXT, time INTEGER, tokens INTEGER, tick BOOL)")
+    c.execute("INSERT INTO playground (id, name, model, prompt, all_choices, best_choice_text, time, tokens, tick) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", ('',name, 'gpt-turbo', msg_content, '', full_msg, unix_time, 0, False))
+    conn.commit()
+    conn.close()
+    
+

@@ -26,7 +26,7 @@ const Playground = (props) => {
   const [system, setSystem] = useState('');
 
 
-  const [history, setHistory] = useState('0');
+  const [history, setHistory] = useState('1');
   const [result, setResult] = useState('');
   const [prompt, setPrompt] = useState('');
   const [names, setNames] = useState([]);
@@ -198,6 +198,7 @@ const Playground = (props) => {
             enableLiveAutocompletion: false,
             enableSnippets: false,
             showLineNumbers: true,
+            wrapEnabled: true, // Added option for automatic word wrap
             tabSize: 1,
           }}/><br />
       </div>  
@@ -457,6 +458,8 @@ return (
               enableSnippets: false,
               showLineNumbers: true,
               tabSize: 1,
+              wrapEnabled: true // Added option for automatic word wrap
+              
           }}/>
           <Button
             disabled={butt}
