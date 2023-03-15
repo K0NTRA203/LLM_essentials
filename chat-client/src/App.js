@@ -52,7 +52,13 @@ const App = () => {
     },
   ];
 
-<Content style={{ marginBottom: '20px' }}>
+<Content style={{ marginBottom: '20px' }}   
+  theme={{
+    algorithm: theme.darkAlgorithm,
+    token: {
+      colorPrimary: '#0203CD'
+    },
+  }}>
 
   <Layout>
     <div className="header">
@@ -66,7 +72,7 @@ const App = () => {
 </Content>;
 
   return (
-    <html style={{ height: '100%' }}>
+    // <html style={{ height: '100%' colorPrimary: 'black'}}>
       <ConfigProvider
         style={{ fontFamily: 'monospace' }}
         theme={{
@@ -131,7 +137,7 @@ const App = () => {
             </Layout>
           </Content>
       </ConfigProvider>
-    </html>
+    // </html>
   );
 };
 

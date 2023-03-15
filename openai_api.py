@@ -26,6 +26,7 @@ def _make_gptapi_history(system_str, name, x):
     for i in range(len(prompts)):
         messages.append({"role": "user", "content": prompts[i]})
         messages.append({"role": "assistant", "content": responses[i]})
+        # print(messages)
     return messages
 
 
@@ -43,9 +44,9 @@ def gpt_api(name, x, system_str , msg_content):
         
     )
     print(completion)
-    msg = completion['choices'][0]['message']['content']
-    print(msg)
-    return msg
+    res = completion['choices'][0]['message']['content']
+    print(res)
+    return res
 
 def pg_history_from_db(name,x):
      #open connection to database
@@ -113,7 +114,7 @@ def gpt_stream(name, msg_content, included_hist, system):
 
     for completion in openai.ChatCompletion.create(
         model='gpt-3.5-turbo',
-        messages=current_message,
+        messages=history,
         stream=True
     ):
         reason = completion['choices'][0]['finish_reason']

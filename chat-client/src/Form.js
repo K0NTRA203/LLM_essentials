@@ -64,7 +64,6 @@ const FForm = (props) => {
   // On component mount
  
 
-  let isInCodeBlock = false;
   const devideTextAndCode = (txt) => {
     // console.log('whole text', txt);
     
@@ -72,7 +71,7 @@ const FForm = (props) => {
     console.log('line arrays',txtArr);
     const result = [];
     let currentTxt = '';
-    // let isInCodeBlock = false;
+    let isInCodeBlock = false;
     let currentIndentation = '';
   
     for (let i = 0; i < txtArr.length; i++) {
@@ -375,6 +374,7 @@ const handleDeleteName = async (name) => {
         setPrompt('');
         // setCurrentText('');
         setLodalVisible(false);
+        if (includeHistory){setHistSlider(histSlider+1)}
         return;
       }
   
@@ -536,16 +536,10 @@ return (
               checked={includeHistory} 
               onChange={() => {
                         setIncludeHistory(!includeHistory);
-                        setHistSlider(0);
-                        if (!includeHistory) {
-                          
-                          console.log(histSlider)
-                        }
               }}>
             </Switch> 
      
             Remember History
-          {includeHistory && (
             <Slider 
               value={histSlider}
               onChange={setHistSlider}
@@ -553,7 +547,6 @@ return (
               max={20}
               step={1}
             />
-          )}
                     <br/><br/>
             Role:
             <TextArea value={system} 

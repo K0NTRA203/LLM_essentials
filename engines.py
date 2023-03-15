@@ -5,6 +5,7 @@ import openai
 import embedding
 import embed
 import sqlite3
+import time
 
 def query_engines(data):
         print(data)
@@ -106,10 +107,14 @@ def query_gpt(bot,conversation_name, conversation_id='', parent_message_id='', u
         yield 'data: DONEDONE\n\n'
 
 def query_gpt_api_stream(name, prompt, included_hist, system):
+    start_time = time.time()
     for data in gpt_stream(name, prompt, included_hist, system):
+        if time.time() - start_time > 60:
+            yield f"data: TIMEOUT! TRY AGAIN\n\n"
+            yield f"data: [DONE]\n\n"
+            break
         print(data)
         yield data
-    
           
 
 
