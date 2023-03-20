@@ -85,10 +85,20 @@ def playground_names():
     resp.headers['Access-Control-Allow-Methods'] = 'GET'
     return resp
 
-@app.route('/playground/names', methods=['DELETE'])
+@app.route('/playground/names/', methods=['DELETE','OPTIONS'])
 def delete_names():   
+    # if request.method == 'OPTIONS':
+    #     print('****RECIEVED OPTIONS REQUEST FOR DELETE****')
+    #     headers = {
+    #         'Access-Control-Allow-Origin': '*',
+    #         'Access-Control-Allow-Methods': 'DELETE',
+    #         'Access-Control-Allow-Headers': '*',
+    #     }
+    #     return ('', 204, headers)
+    # elif request.method == 'DELETE':
     data = request.get_json()
     name = data['name']
+    print(f"TRYING TO DELETE {name}")
     db = sqlite3.connect('database.db')
     cursor = db.cursor()
     cursor.execute("DELETE FROM playground WHERE name=?", (name,))
@@ -120,7 +130,7 @@ def get_conversation_names():
 @app.route('/gpt/names', methods=['DELETE'])
 def delete_conversation():
     data = request.get_json()
-    conversation_name = data['conv_name']
+    conversation_name = data['name']
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
     c.execute("DELETE FROM chat_messages WHERE conversation_name=?", (conversation_name,))

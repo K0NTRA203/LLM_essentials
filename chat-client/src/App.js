@@ -52,7 +52,7 @@ const App = () => {
     },
   ];
 
-<Content style={{ marginBottom: '20px' }}   
+<Content style={{ height: "100vh" }}   
   theme={{
     algorithm: theme.darkAlgorithm,
     token: {
@@ -60,7 +60,7 @@ const App = () => {
     },
   }}>
 
-  <Layout>
+  <Layout  style={{ height: "100vh" }}>
     <div className="header">
 
       {page === 'conversation' && <FForm handlePageChange={handlePageChange} />}
@@ -74,7 +74,7 @@ const App = () => {
   return (
     // <html style={{ height: '100%' colorPrimary: 'black'}}>
       <ConfigProvider
-        style={{ fontFamily: 'monospace' }}
+        style={{  fontFamily: 'monospace', height: "100vh" }}
         theme={{
           algorithm: theme.darkAlgorithm,
           token: {
@@ -83,16 +83,18 @@ const App = () => {
         }}
       >
 
-        <Content style={{ marginBottom: '20px' }}>
-          <Layout>
+        <Content style={{ height: "100vh" }}>
+          <Layout style={{ height: "100vh" }}>
 
                 {page === 'conversation' && (
                   <div className="header">
-                    <Dropdown menu={{items}}>
+                    <Dropdown menu={{items}} >
                       <a onClick={(e) => e.preventDefault()}>
                         <Space>
-                          Hover me
-                        </Space>
+                        <img
+                          src= "https://gcdnb.pbrd.co/images/UQSd7bsh4Nvx.png"
+                          style={{ width: '70%', height: '70%',display: 'block', margin: '0 auto', marginTop: '5px', marginBottom: '5px'}}
+                        />                        </Space>
                       </a>
                     </Dropdown>
                 <FForm handlePageChange={handlePageChange}/>
@@ -104,7 +106,10 @@ const App = () => {
                     <Dropdown menu={{items}}>
                       <a onClick={(e) => e.preventDefault()}>
                         <Space>
-                          Hover me
+                        <img
+                          src= "https://gcdnb.pbrd.co/images/UQSd7bsh4Nvx.png"
+                          style={{ width: '70%', height: '70%',display: 'block', margin: '0 auto', marginTop: '5px', marginBottom: '5px'}}
+                        />     
                         </Space>
                       </a>
                     </Dropdown>
@@ -117,7 +122,10 @@ const App = () => {
                     <Dropdown menu={{items}}>
                       <a onClick={(e) => e.preventDefault()}>
                         <Space>
-                          Hover me
+                        <img
+                          src= "https://gcdnb.pbrd.co/images/UQSd7bsh4Nvx.png"
+                          style={{ width: '70%', height: '70%',display: 'block', margin: '0 auto', marginTop: '20px', marginBottom: '20px'}}
+                        />     
                         </Space>
                       </a>
                     </Dropdown>
@@ -129,8 +137,10 @@ const App = () => {
                     <Dropdown menu={{items}}>
                       <a onClick={(e) => e.preventDefault()}>
                         <Space>
-                          Hover me
-                        </Space>
+                        <img
+                          src= "https://gcdnb.pbrd.co/images/UQSd7bsh4Nvx.png"
+                          style={{ width: '70%', height: '70%',display: 'block', margin: '0 auto', marginTop: '20px', marginBottom: '20px'}}
+                        />                             </Space>
                       </a>
                     </Dropdown>
                 </div>)}

@@ -7,6 +7,11 @@ import {
 import AceEditor from "react-ace";
 import "ace-builds/src-noconflict/theme-terminal";
 import "ace-builds/src-noconflict/mode-python";
+import AceEditorComp from './helper/AceEditor';
+import AceInput from './helper/AceEditorInput';
+import TypewriterText from "./helper/Typewriter";
+import devideTextAndCode from "./helper/DevideTextAndCode";
+
 
 const { Content, Sider } = Layout;
 const { TextArea } = Input;
@@ -50,181 +55,32 @@ const Playground = (props) => {
   const prettier = require("prettier");
   const tsParser = require("prettier/parser-typescript");
   
-  function makeVariableNamesColored(str) {
-    const regex = /`([^`]+)`/g; // regex to match name within backticks
-    const parts = str.split(regex); // split string by name
-  
-    // map parts array to elements with name in <Text> component
-    const elements = parts.map((part, i) => {
-      if (part.match(regex)) {
-        // name found
-        return <Text key={i} type="success">{part.slice(1, -1)}</Text>;
-      } else {
-        // plain text
-        return <span key={i}>{part}</span>;
-      }
-    });
-  
-    // join elements together and return
-    return <>{elements}</>;
-  }
-
-  // Scrolling inside the card for every msg update
-  function TypewriterText({ text, setIsRendered, cardRef }) {
-    const [currentText, setCurrentText] = useState("");
-    let i = 0;
-    const randomTime = 0.001;
-    useEffect(() => {
-      let modifiedText = text.replace(/\n/g, "\n\r");
-      modifiedText = modifiedText.replace(/\r/g, "<br />");
-  
-      const interval = setInterval(() => {
-        setCurrentText(modifiedText.slice(0, i));
-        i++;
-        cardRef.current.scrollTo(0, cardRef.current.scrollHeight);
-        if (i > modifiedText.length) {
-          clearInterval(interval);
-          setPrompt('');
-          fetchMsgs();
-          setIsRendered(true);
-          cardRef.current.scrollTo(0, cardRef.current.scrollHeight);
-
-
-        }
-      }, randomTime); 
-      return () => clearInterval(interval);
-    }, [text]);
-    return <p dangerouslySetInnerHTML={{ __html: currentText}} />;
-  }
-
-
-  const devideTextAndCode = (txt) => {
-    console.log('whole text', txt);
-    const txtArr = txt.split('\n');
-    console.log('line arrays',txtArr);
-    const result = [];
-    let currentTxt = '';
-    let isInCodeBlock = false;
-    let currentIndentation = '';
-  
-    for (let i = 0; i < txtArr.length; i++) {
-      const line = txtArr[i];
-
-      if (line === txtArr[i-1]) {
-        currentTxt += line.replace(/\n/g, 'd');
-    }
-      
-      if (line === '') {
-        currentTxt += '\n';
-        continue;
-    }
-      if (line.startsWith('\n')) {
-        console.log('startswithnewline', line);
-        console.log('currenttextbefore', currentTxt);
-
-        currentTxt = currentTxt.slice(0, -1);
-        console.log('currenttextafta', currentTxt);
-
-    }
-
-      if (line.startsWith('')) {
-        console.log('startswithnothing', line);
-        currentTxt += '\n';
-        
-      }
-      if (line.startsWith('```') || line === '```') {
-        if (isInCodeBlock) {
-          // end of code block
-          result.push({ type: 'code', content: currentTxt });
-          currentTxt = '';
-          isInCodeBlock = false;
-        } else {
-          // start of code block
-          if (currentTxt !== '') {
-            result.push({ type: 'text', content: currentTxt });
-            currentTxt = '';
-          }
-          isInCodeBlock = true;
-        }
-      } else {
-        if (isInCodeBlock) {
-          const newIndentation = line.match(/^\s*/)[0];
-          if (newIndentation.length === 0) {
-            currentTxt += line.replace(/\n/g, '\n');
-          } else if (newIndentation.length >= currentIndentation.length || newIndentation.length <= currentIndentation.length) {
-              console.log('INDENT',line, newIndentation);
-              currentTxt += line.replace(/\n/g, '\n');
-            currentIndentation = newIndentation;
-          } else {
-            // currentTxt += line.substring(currentIndentation.length).replace(/\n/g, '\n');
-          }
-        } else {
-          // currentTxt += line.replace(/\n/g, '\n') 
-          currentTxt += line.replace(/\n/g, "\n\r") + '<br\>';
-
-        }
-      }
-    }
-    if (currentTxt !== '') {
-      result.push({ type: isInCodeBlock ? 'code' : 'text', content: currentTxt });
-    }
-
-    return result;  
-  }
-  function onChange(newValue) {
-    console.log("change", newValue);
-  }
-  
-  
-
-
   const renderAceEditor = (content) => {
     return (
       <div>          
-        <AceEditor
-          width="100%"
-          maxLines={content.match(/\n/g).length + 1}
-          mode="python"
-          theme="terminal"
-          name="blah2"
-          readOnly={true}
-          fontSize={14}
-          showPrintMargin={true}
-          showGutter={true}
-          highlightActiveLine={false}
-          value={content}
-          setOptions={{
-            enableBasicAutocompletion: false,
-            enableLiveAutocompletion: false,
-            enableSnippets: false,
-            showLineNumbers: true,
-            wrapEnabled: true, // Added option for automatic word wrap
-            tabSize: 1,
-          }}/><br />
+      <AceEditorComp content={content} />
       </div>  
     );
   };
-
 
   // Making cards from recieved messages
   useEffect(() => {
     fetchMsgs();
     fetchNames();
-
   }, [name, history]);
+
   function onChange(newValue) {
     console.log("change", newValue);
     setPrompt(newValue);
     console.log(histSlider)
     console.log(includeHistory)
-    
   }
 
   useEffect(() => {
     const cards = messages.map(message => {
       console.log('Writing Cards');
-      const seperatedres = devideTextAndCode(message.best_choice_text);
-      const seperatedprompt = devideTextAndCode(message.prompt);
+      const seperatedres = devideTextAndCode(message.best_choice_text, true);
+      const seperatedprompt = devideTextAndCode(message.prompt, true);
 
       const seperatedResCards = seperatedres.map(item => (
         <div key={item.content}>
@@ -239,24 +95,21 @@ const Playground = (props) => {
         </div>
       ));
       
-    
       return (
-      <div> <p>
-        <br></br>
-        <Card style={{backgroundColor:'#1a0000', fontFamily: 'monospace'}}>
-          🧠: {seperatedPromptCards}
-        </Card>
-        <Card style={{fontFamily: 'monospace'}}>
-        🤖: {seperatedResCards}
-        </Card>
-        </p>
-      </div>
-      
+        <div class="scroller"> <p>
+          <br></br>
+          <Card style={{backgroundColor:'#1a0000', fontFamily: 'monospace'}}>
+            🧠: {seperatedPromptCards}
+          </Card>
+          <Card style={{fontFamily: 'monospace'}}>
+          🤖: {seperatedResCards}
+          </Card>
+          </p>
+        </div>
       );
     });
-  
+
     setCards(cards);
-  
   }, [messages, isRendered,result]);
 
   const fetchMsgs = async () => {
@@ -265,18 +118,18 @@ const Playground = (props) => {
       console.log(history)
       const res = await fetch(`http://localhost:3002/playground/messages?name=${name}&x=${history}`);
       const data = await res.json();
-
       setMessages(data.messages);
       console.log(messages);
     } catch (err) {
       console.error(err);
     };
 };
+
 useLayoutEffect(() => {
   cardRef.current.scrollTo(0, cardRef.current.scrollHeight);
   }, [cards, isRendered]);
 
-// Fetching
+// Fetching Names
   const fetchNames = async () => {
     try {
       const res = await fetch('http://localhost:3002/playground/names');
@@ -300,7 +153,6 @@ useLayoutEffect(() => {
     }
   }
   
-
   const handleNewChatClick = () => {
     setModalVisible(true);
   };
@@ -349,16 +201,12 @@ useLayoutEffect(() => {
         response.json().then(data => {
           setLastQuery(prompt);
           setButt(false);
-
           setIsRendered(false);
-
           fetchMsgs();
           setPrompt('');
-          // above line should be commented when typewriter is on
+          // COMMENT ABOVE LINE IF USING TYPEWRITER EFFECT
           setResult(data.result);
           cardRef.current.scrollTo(0, cardRef.current.scrollHeight);
-          // console.log(formattedText);
-          
         })
       }
     })
@@ -368,9 +216,8 @@ useLayoutEffect(() => {
   }
 
 return (
-<html style={{ height: '100%' }}>
   <ConfigProvider
-  style={{fontFamily:'monospace'}}
+  style={{ height: '100vh', fontFamily:'monospace'}}
   theme={{
     algorithm: theme.darkAlgorithm,
     token: {
@@ -379,7 +226,6 @@ return (
   }}
   >
   <Layout>   
-     
   <Sider style={{ marginRight: '20px', marginBottom: '20px' }}>
   <Menu style={{ backgroundColor:'black', fontFamily:'monospace', fontWeight: 700}}>
 
@@ -411,7 +257,7 @@ return (
   <Form onSubmit={handleSubmit}>
 
   <Space direction="vertical" size="large" style={{ display: 'flex' }}>
-      <Card ref={cardRef} title={name} value={result} style={{fontFamily: 'monospace', height: 'calc(100vh * 0.66)', overflow: 'auto', maxHeight: 'calc(100vh * 0.66)', overflowY: 'scroll' }}> 
+      <Card class='scroller' ref={cardRef} title={name} value={result} style={{fontFamily: 'monospace', height: 'calc(100vh * 0.66)', overflow: 'auto', maxHeight: 'calc(100vh * 0.66)', overflowY: 'scroll' }}> 
       {cards} 
        {/* {!isRendered && result && (
           <div>
@@ -420,7 +266,7 @@ return (
               🧠: {lastQuery}
             </Card>
             <Card style={{fontFamily: 'monospace'}}>
-            🤖:<TypewriterText text={result} setIsRendered={setIsRendered} cardRef={cardRef} />
+            🤖:<TypewriterText text={result} setIsRendered={setIsRendered} cardRef={cardRef} setPrompt={setPrompt} fetchMsgs={fetchMsgs} />
 
             </Card>
           </div>
@@ -428,57 +274,32 @@ return (
       {/* UNCOMMENT ABOVE CODE FOR TYPEWRITER EFFECT */}
       </Card> 
       
-        <div> 
-          {/* <Card style={{height: 'calc(100vh * 0.3)'}}  */}
-          <Card style={{height: 'auto'}} 
-
-                      onKeyDown={e => {if (e.key === 'Enter' && e.ctrlKey) handleSubmit(e);}}>
-          {/* <TextArea value={prompt} showCount maxLength={100000} 
-            onChange={e => setPrompt(e.target.value)}  
-            onKeyDown={e => {if (e.key === 'Enter' && e.ctrlKey) handleSubmit(e);}} /> */}
-        <div style={{ position: 'relative' }}>
-          <AceEditor
-            onChange={onChange}
-            minLines={4}
-            width="100%"
-            height="100%"
-            maxLines={9}
-            mode="python"
-            theme="terminal"
-            name="blah2"
-            readOnly={false}
-            fontSize={14}
-            showPrintMargin={true}
-            showGutter={true}
-            highlightActiveLine={true}
-            value={prompt}
-            setOptions={{
-              enableBasicAutocompletion: false,
-              enableLiveAutocompletion: false,
-              enableSnippets: false,
-              showLineNumbers: true,
-              tabSize: 1,
-              wrapEnabled: true // Added option for automatic word wrap
-              
-          }}/>
-          <Button
-            disabled={butt}
-            type="primary"
-            htmlType="submit"
-            onClick={handleSubmit}
-            style={{ position: 'absolute', top: 10, right: 10 }}
-          >
-            Send
-          </Button>
-        </div>
-
-      </Card> 
-        </div> 
+      <div> 
+        <Card style={{height: 'auto'}} 
+                    onKeyDown={e => {if (e.key === 'Enter' && e.ctrlKey) handleSubmit(e);}}>
+          <div style={{ position: 'relative' }}>
+            <AceInput prompt={prompt} onChange={onChange} />
+            <Button
+              disabled={butt}
+              type="primary"
+              htmlType="submit"
+              onClick={handleSubmit}
+              style={{ position: 'absolute', top: 10, right: 10 }}>
+              Send
+            </Button>
+          </div>
+        </Card> 
+      </div> 
     </Space> 
   </Form>
 </Content>
-<Sider style={{ marginLeft: '20px', fontFamily:'monospace' }} >
-        <form style={{padding:'7px'}} onSubmit={handleSubmit}>
+
+<Sider style={{ 
+  marginLeft: '20px', 
+  fontFamily:'monospace',
+  color: 'ED333B' // add color property
+}} >
+        <form style={{padding:'7px', color: 'ED333B' }} onSubmit={handleSubmit}>
           <label>
             Engine:
             <select value={engine} onChange={e => setEngine(e.target.value)}>
@@ -581,7 +402,6 @@ return (
       
     </Layout>
     </ConfigProvider>
-    </html>
   );
 };
 export default Playground;

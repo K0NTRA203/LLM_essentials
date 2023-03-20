@@ -1,13 +1,18 @@
 import React, {useRef, useState, useEffect } from 'react';
-import {Checkbox, Switch, Modal, Layout, Menu, Input, Slider, Card, Button,Space,ConfigProvider,theme} from 'antd';
+import {Checkbox, Drawer,  Switch, Modal, Layout, Menu, Input, Slider, Card, Button,Space,ConfigProvider,theme} from 'antd';
 import {
   DeleteRowOutlined
 } from '@ant-design/icons';
 import { blue } from '@ant-design/colors';
 
 import AceEditor from "react-ace";
+import AceEditorComp from './helper/AceEditor';
 import "ace-builds/src-noconflict/theme-terminal";
 import "ace-builds/src-noconflict/mode-python";
+import TypewriterText from "./helper/Typewriter";
+import devideTextAndCode from "./helper/DevideTextAndCode";
+import AceInput from './helper/AceEditorInput';
+import AudioRecorder from './helper/Recording.js';
 
 
 
@@ -24,7 +29,6 @@ const FForm = (props) => {
   const [currentText, setCurrentText] = useState("");
   const [isRendered, setIsRendered] = useState(false);
   const [lastPrompt, setLastPrompt] = useState('');
-
 
 
   const [engine, setEngine] = useState('gpt-3.5-turbo');
@@ -55,7 +59,7 @@ const FForm = (props) => {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [loadingVisible, setLodalVisible] = useState(false);
   const [cardVisiblity, setCardVisiblity] = useState(false);
-
+  const [historic, setHistoric] = useState(true);
 
   
   const [name, setName] = useState('');
@@ -64,81 +68,6 @@ const FForm = (props) => {
   // On component mount
  
 
-  const devideTextAndCode = (txt) => {
-    // console.log('whole text', txt);
-    
-    const txtArr = txt.split('~~~');
-    console.log('line arrays',txtArr);
-    const result = [];
-    let currentTxt = '';
-    let isInCodeBlock = false;
-    let currentIndentation = '';
-  
-    for (let i = 0; i < txtArr.length; i++) {
-      const line = txtArr[i];
-
-      if (line === txtArr[i-1]) {
-        currentTxt += line.replace(/\n/g, 'd');
-    }
-      
-      if (line === '') {
-        currentTxt += '\n';
-        continue;
-    }
-      if (line.startsWith('\n')) {
-        // console.log('startswithnewline', line);
-        // console.log('currenttextbefore', currentTxt);
-
-        currentTxt = currentTxt.slice(0, -1);
-
-    }
-
-      if (line.startsWith('')) {
-        // console.log('startswithnothing', line);
-        currentTxt += '\n';
-        
-      }
-      if (line.startsWith('```') || line === '```' || line.endsWith('```') || line === '``') {
-        if (isInCodeBlock) {
-          // end of code block
-          result.push({ type: 'code', content: currentTxt });
-          currentTxt = '';
-          isInCodeBlock = false;
-        } else {
-          // start of code block
-          if (currentTxt !== '') {
-            result.push({ type: 'text', content: currentTxt });
-            currentTxt = '';
-          }
-          isInCodeBlock = true;
-        }
-      } else {
-        if (isInCodeBlock) {
-          const newIndentation = line.match(/^\s*/)[0];
-          if (newIndentation.length === 0) {
-            currentTxt += line.replace(/\n/g, '\n');
-          } else if (newIndentation.length >= currentIndentation.length || newIndentation.length <= currentIndentation.length) {
-              // console.log('INDENT',line, newIndentation);
-              currentTxt += line.replace(/\n/g, '\n');
-            currentIndentation = newIndentation;
-          } else {
-            // currentTxt += line.substring(currentIndentation.length).replace(/\n/g, '\n');
-          }
-        } else {
-          // currentTxt += line.replace(/\n/g, '\n') 
-          currentTxt += line.replace(/\n/g, "\n\r") + '<br\>';
-
-        }
-      }
-    }
-    // console.log('CURRENT TEXXXXXT', currentTxt);
-
-    if (currentTxt !== '') {
-      result.push({ type: isInCodeBlock ? 'code' : 'text', content: currentTxt });
-    }
-
-    return result;  
-  }
   function onChange(newValue) {
     console.log("change", newValue);
   }
@@ -154,26 +83,7 @@ const FForm = (props) => {
   const renderAceEditor = (content) => {
     return (
       <div>          
-        <AceEditor
-          width="100%"
-          maxLines={content.match(/\n/g).length + 1}
-          mode="python"
-          theme="terminal"
-          name="blah2"
-          readOnly={true}
-          fontSize={14}
-          showPrintMargin={true}
-          showGutter={true}
-          highlightActiveLine={false}
-          value={content}
-          setOptions={{
-            enableBasicAutocompletion: false,
-            enableLiveAutocompletion: false,
-            enableSnippets: false,
-            showLineNumbers: true,
-            wrapEnabled: true, // Added option for automatic word wrap
-            tabSize: 1,
-          }}/><br />
+      <AceEditorComp content={content} />
       </div>  
     );
   };
@@ -193,13 +103,12 @@ const FForm = (props) => {
   }
 
 
-
+  // CURRENT CARD
   useEffect(() => {
-    // CURRENT CARD
     console.log('****RENDER****');
     console.log('chunk', chunk);
-    const seperatedCurrentPrompt = devideTextAndCode(lastPrompt);
-    const seperatedCurrentResponse = devideTextAndCode(currentText);
+    const seperatedCurrentPrompt = devideTextAndCode(lastPrompt, false);
+    const seperatedCurrentResponse = devideTextAndCode(currentText, false);
 
     const seperatedCurrentResCards = seperatedCurrentResponse.map(item => (
       <div key={item.content}>
@@ -237,12 +146,12 @@ const FForm = (props) => {
       console.log('CURRENT', currentCard);
   }, [currentCard]);
 
+  // HISTORIC CARDS
   useEffect(() => {
-    // HISTORIC CARDS
     const cards = messages.map(message => {
       console.log('Writing Cards');
-      const seperatedres = devideTextAndCode(message.best_choice_text);
-      const seperatedprompt = devideTextAndCode(message.prompt);
+      const seperatedres = devideTextAndCode(message.best_choice_text, true);
+      const seperatedprompt = devideTextAndCode(message.prompt, true);
 
       const seperatedResCards = seperatedres.map(item => (
         <div key={item.content}>
@@ -299,18 +208,23 @@ const fetchNames = async () => {
 }
 
 
-const handleDeleteName = async (name) => {
+const handleDeleteName = async () => {
   try {
+    console.log('deleting name', name);
     await fetch(`http://localhost:3002/playground/names?name=${name}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+      }
     });
     //Refetch the names after deletion
     fetchNames();
+    setDeleteModalVisible(false);
   } catch (err) {
     console.error(err);
   }
 }
-
 
   const handleNewChatClick = () => {
     setModalVisible(true);
@@ -324,8 +238,6 @@ const handleDeleteName = async (name) => {
   const handleDeleteModalCancel = () => {
     setDeleteModalVisible(false);
   };
-
-  
   const handleNameChange = e => {
     setName(e.target.value);
   };
@@ -339,6 +251,7 @@ const handleDeleteName = async (name) => {
     fetchMsgs();
   };
   
+// SUBMITING CHAT PROMPT
   useEffect(() => {
     if (submit !== 'submitted' || prompt === '') {
       return;
@@ -349,21 +262,16 @@ const handleDeleteName = async (name) => {
     url.searchParams.append('hist', histSlider);
     url.searchParams.append('system', system);
 
-
-  
+// GETTING THE RESPONSE
     const eventSource = new EventSource(url);
     eventSource.onmessage = handleStream;
     console.log('polling');
   
     function handleStream(e) {
-
       const dataWithNewline = e.data;
-
-
       console.log('data', dataWithNewline);
       setChunk(dataWithNewline);
       // console.log('chunk',chunk);
-
   
       if (dataWithNewline === '[DONE]') {
         setSubmit('unsubmitted');
@@ -381,96 +289,97 @@ const handleDeleteName = async (name) => {
       setIsRendered(false);
       setLodalVisible(false);
       setCurrentText(prevText => prevText + dataWithNewline);
-      console.log('******CURRENT TEXT IS CHANGING');
-
+      // console.log('******CURRENT TEXT IS CHANGING');
     }
   }, [submit]);
 
 return (
-  <ConfigProvider
+<ConfigProvider
   style={{fontFamily:'monospace'}}
   theme={{
     algorithm: theme.darkAlgorithm,
     token: {
       colorPrimary: '#0203CD'
-      
-      
     },
-  }}
-  >
-    <Layout>
-      
-    <Sider style={{ backgroundColor:'black', marginRight: '20px', marginBottom: '20px' }}>
+  }}>
+  <Layout>
+    
+  <Sider style={{ backgroundColor:'black', marginRight: '20px', marginBottom: '20px' }}>
     <Menu style={{backgroundColor:'black', fontFamily:'monospace', fontWeight: 700}}>
-    <Menu.Item key="1" onClick={handleNewChatClick}>New Chat</Menu.Item>
-    {names.map(name => (
-      <Menu.Item key={name} onClick={() => {setName(name); fetchMsgs()}} style={{display: 'flex', alignItems: 'center'}}>
-          <span style={{flex: 1, textAlign: 'left'}}>{name + '    '}</span>
-          <DeleteRowOutlined onClick={() => setDeleteModalVisible(true)} style={{cursor: 'pointer',flex: 1, textAlign: 'right'}}/>
-      </Menu.Item>
-    ))}
-</Menu>
+      <Menu.Item key="1" onClick={handleNewChatClick}>New Chat</Menu.Item>
+      {names.map(name => (
+        <Menu.Item key={name} onClick={() => {setName(name); fetchMsgs()}} style={{display: 'flex', alignItems: 'center'}}>
+            <span style={{flex: 1, textAlign: 'left'}}>{name + '    '}</span>
+            <DeleteRowOutlined onClick={() => setDeleteModalVisible(true)} style={{cursor: 'pointer',flex: 1, textAlign: 'right'}}/>
+        </Menu.Item>
+      ))}
+    </Menu>
+    <label>
+      History:
+      <Input
+        type="number"
+        value={history}
+        onChange={e => {setHistory(e.target.value); fetchMsgs()}}
+        min={1}
+        max={10}
+       />
+    </label>
+  </Sider>
 
-  <label>
-            History:
-            <Input
-              type="number"
-              value={history}
-              onChange={e => {setHistory(e.target.value); fetchMsgs()}}
-              min={1}
-              max={10}
-          />
-          </label>
-
-</Sider>
-<Modal style={{fontFamily:'monospace'}}
-  title={`YOU ARE DELETING ${name}`}  
-  open={deleteModalVisible}
-  onOk={handleDeleteName}
-  onCancel={handleDeleteModalCancel}>
-    <Input value={name} onChange={handleNameChange} />
-</Modal>
-<Modal style={{fontFamily:'monospace'}}
-  title="Enter a name"
-  open={modalVisible}
-  onOk={handleModalConfirm}
-  onCancel={handleModalCancel}>
-    <Input value={name} onChange={handleNameChange} />
-</Modal>
+  <Modal style={{fontFamily:'monospace'}}
+      title={`YOU ARE DELETING ${name}`}  
+      open={deleteModalVisible}
+      onOk={handleDeleteName}
+      onCancel={handleDeleteModalCancel}>
+  </Modal>
+  <Modal style={{fontFamily:'monospace'}}
+      title="Enter a name"
+      open={modalVisible}
+      onOk={handleModalConfirm}
+      onCancel={handleModalCancel}>
+      <Input value={name} onChange={handleNameChange} />
+  </Modal>
 <Space direction="vertical"></Space>
-
-
 <Content style={{fontFamily:'monospace'}}>
-<Space direction="vertical" size="large" style={{ display: 'flex' }}>
-      <Card ref={cardRef} title={name} value={result} style={{fontFamily: 'monospace', height: 'calc(100vh * 0.66)', overflow: 'auto', maxHeight: 'calc(100vh * 0.66)', overflowY: 'scroll' }}>
-        {cards}
+  <Space direction="vertical" size="large" style={{ display: 'flex' }}>
+      <Card ref={cardRef} title={name} value={result} style={{fontFamily: 'monospace', height: '80vh', overflow: 'auto', maxHeight: 'calc(100vh * 1)', overflowY: 'scroll' }}>
+          {cards}
         {cardVisiblity && (
-        <div>
-        {currentCard}
-        </div>
+          <div>
+          {currentCard}
+          </div>
         )}
       </Card>
-   
         {loadingVisible && (
-        <img
-          src= "loading.gif"
-          style={{ width: '70%', height: '70%',display: 'block', margin: '0 auto', marginTop: '20px'}}
-          alt="loading"
-        />)}
-
+          <img
+            src= "loading.gif"
+            style={{ width: '70%', height: '70%',display: 'block', margin: '0 auto', marginTop: '20px'}}
+            alt="loading"
+          />)}
       <div> 
-      <Card >
-        <TextArea value={prompt} showCount maxLength={100000} onChange={e => setPrompt(e.target.value)} onKeyPress={e => {if (e.key === 'Enter') handleSubmit()}}  />
-        <Button disabled={butt} type="primary" onClick={handleSubmit}>Send</Button>
-      </Card> 
+        <div style={{ position: 'relative', height: '20vh', marginBottom:'130px' }}
+                      onKeyDown={e => {if (e.key === 'Enter' && e.ctrlKey) handleSubmit(e);}}>
+            <AceInput prompt={prompt} onChange={onChange} />
+            <AudioRecorder/>
+
+            <Button
+              disabled={butt}
+              type="primary"
+              htmlType="submit"
+              onClick={handleSubmit}
+              style={{ position: 'absolute', top: 10, right: 10 }}>
+              Send
+            </Button>
+            
+          </div>
       </div> 
     </Space> 
 </Content>
-<Sider style={{ marginLeft: '20px', fontFamily:'monospace' }} >
-        <form style={{padding:'7px'}} onSubmit={handleSubmit}>
-          <label>
+<Sider className="coloredText" style={{ marginLeft: '20px', fontFamily:'monospace' }} >
+        <form style={{padding:'7px', color: '#ED333B' }} onSubmit={handleSubmit}>
+          <label className="coloredText">
             Engine:
-            <select value={engine} onChange={e => setEngine(e.target.value)}>
+            <select className="coloredText" value={engine} onChange={e => setEngine(e.target.value) }>
               <option value="gpt-3.5-turbo">ChatGPT API</option>
               <option value="babbage:2020-05-03">Babbage 2020-05-03</option>
               <option value="text-davinci-003">davinci</option>
@@ -487,7 +396,7 @@ return (
           <label>
             Max Tokens:
             
-            <Input
+            <Input className="coloredText"
               type="number"
               value={maxTokens}
               onChange={e => setMaxTokens(e.target.value)}
@@ -496,12 +405,13 @@ return (
           <br />
           <label>
             N:
-            <Input type="number" value={n} onChange={e => setN(e.target.value)} min={1} max={5} />
+            <Input className="coloredText" type="number" value={n} onChange={e => setN(e.target.value)} min={1} max={5} />
           </label>
           <br />
           <label>
             Stop:
             <Input
+              className="coloredText"
               type="text"
               value={stop}
               onChange={e => setStop(e.target.value)}
@@ -509,9 +419,10 @@ return (
             />
           </label>
           <br/> <br/>
-          <label>
+          <label className="coloredText">
             Temperature:
-            <Slider 
+            <Slider
+              className="coloredText"
               // style={{backgroundColor: '#e8dcec'}}
               value={temp}
               onChange={setTemp}
@@ -521,9 +432,10 @@ return (
             />
           </label>
           <br/> <br/>
-          <label>
+          <label className="coloredText">
             Displaying History:
             <Input
+              className="coloredText"
               type="number"
               value={history}
               onChange={e => {setHistory(e.target.value); fetchMsgs()}}
@@ -540,7 +452,8 @@ return (
             </Switch> 
      
             Remember History
-            <Slider 
+            <Slider
+              className="coloredText"
               value={histSlider}
               onChange={setHistSlider}
               min={0}
@@ -561,7 +474,7 @@ return (
 
           <br />
     </Layout>
-    </ConfigProvider>
+  </ConfigProvider>
   );
 };
 export default FForm;

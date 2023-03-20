@@ -11,10 +11,15 @@
   background-color: black;
 }
 
+
+.coloredText {
+  color: '#ED333B';
+}
+
 .header > button {
   width: 25%;
   height: 100%;
-  color: white;
+  color: rgb(0, 0, 0);
   border: none;
   background-color: black;
   cursor: pointer;
@@ -28,15 +33,16 @@
 
 body {
   font-family: 'Roboto', sans-serif;
-  background-color: #f2f2f2;
+  background-color: #000000;
   margin: 0;
   padding: 0;
 }
 
 .container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
+  /* max-width: 1200px; */
+  /* margin: 0 auto; */
+  /* padding: 0 20px; */
+  height: 100vh;
 }
 #icon {
   display: block;
@@ -71,7 +77,7 @@ button:hover {
   border: 1px solid #2d2d2d;
 }
 .card-container .card-background {
-  background-color: #F5F5F5;
+  background-color: #8c1010;
 }
 input {
   font-family: 'monospace';
@@ -82,7 +88,7 @@ input {
 }
 
 .form-container {
-  background-color: #f2f2f2;
+  background-color: #000000;
   padding: 20px;
   border-radius: 5px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
@@ -90,4 +96,26 @@ input {
 .align-right {
   display: flex;
   justify-content: right;
+}
+.card-container::-webkit-scrollbar {
+  width: 1px;
+}
+
+.card-container::-webkit-scrollbar-thumb {
+  background-color: #4f0404;
+  border-radius: 1px;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  background-color: #100101;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #888;
+}
+.scroller {
+  width: 300px;
+  height: 100px;
+  overflow-y: scroll;
+  scrollbar-color: rebeccapurple green;
 }
