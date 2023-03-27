@@ -1,25 +1,25 @@
 import React, {useRef, useState, useEffect, useLayoutEffect } from 'react';
-import { render } from "react-dom";
+// import { render } from "react-dom";
 import { Typography,Switch, Checkbox, Form, Modal, Layout, Menu, Input, Slider, Card, Button, Space, ConfigProvider,theme } from 'antd';
 import {
   DeleteRowOutlined
 } from '@ant-design/icons';
-import AceEditor from "react-ace";
+// import AceEditor from "react-ace";
 import "ace-builds/src-noconflict/theme-terminal";
 import "ace-builds/src-noconflict/mode-python";
 import AceEditorComp from './helper/AceEditor';
 import AceInput from './helper/AceEditorInput';
-import TypewriterText from "./helper/Typewriter";
+// import TypewriterText from "./helper/Typewriter";
 import devideTextAndCode from "./helper/DevideTextAndCode";
 
 
 const { Content, Sider } = Layout;
 const { TextArea } = Input;
-const { Text } = Typography;
+// const { Text } = Typography;
 
 
 const Playground = (props) => {
-  const { handlePageChange } = props;
+  // const { handlePageChange } = props;
 
   const [engine, setEngine] = useState('gpt-3.5-turbo');
   const [maxTokens, setMaxTokens] = useState(10);

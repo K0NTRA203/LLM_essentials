@@ -1,15 +1,13 @@
-import React, {useRef, useState, useEffect } from 'react';
-import {Checkbox, Drawer,  Switch, Modal, Layout, Menu, Input, Slider, Card, Button,Space,ConfigProvider,theme} from 'antd';
+import React, {useRef, useState, useEffect, memo } from 'react';
+import {Switch, Modal, Layout, Menu, Input, Slider, Card, Button,Space,ConfigProvider,theme} from 'antd';
 import {
   DeleteRowOutlined
 } from '@ant-design/icons';
-import { blue } from '@ant-design/colors';
 
-import AceEditor from "react-ace";
 import AceEditorComp from './helper/AceEditor';
 import "ace-builds/src-noconflict/theme-terminal";
 import "ace-builds/src-noconflict/mode-python";
-import TypewriterText from "./helper/Typewriter";
+// import TypewriterText from "./helper/Typewriter";
 import devideTextAndCode from "./helper/DevideTextAndCode";
 import AceInput from './helper/AceEditorInput';
 import AudioRecorder from './helper/Recording.js';
@@ -19,15 +17,17 @@ import AudioRecorder from './helper/Recording.js';
 const { Content, Sider } = Layout;
 const { TextArea } = Input;
 const FForm = (props) => {
-  const { handlePageChange } = props;
+  // const { handlePageChange } = props;
   const [history, setHistory] = useState('1');
-  const [result, setResult] = useState('');
+  const [result,setResult] = useState('');
   const [prompt, setPrompt] = useState('');
   const [names, setNames] = useState([]);
   const [messages, setMessages] = useState([]);
   const [submit, setSubmit] = useState('');
   const [currentText, setCurrentText] = useState("");
   const [isRendered, setIsRendered] = useState(false);
+  const [role, setRole] = useState(false);
+
   const [lastPrompt, setLastPrompt] = useState('');
 
 
@@ -41,37 +41,47 @@ const FForm = (props) => {
   const [system, setSystem] = useState('');
 
 
-  const [tick, setTick] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  // const [tick, setTick] = useState(false);
+  // const [isLoading, setIsLoading] = useState(false);
 
-  const [socket, setSocket] = useState(null);
+  // const [socket, setSocket] = useState(null);
 
 
-  const [lastResult, setLastResult] = useState('sss');
-  const [lastQuery,setLastQuery] = useState('');
+  // const [lastResult, setLastResult] = useState('sss');
+  // const [lastQuery,setLastQuery] = useState('');
   const [cards,setCards] = useState([]);
   const [currentCard,setCurrentCard] = useState([]);
-  const seperatedres = [];
-  const seperatedprompt = [];
+  // const seperatedres = [];
+  // const seperatedprompt = [];
   const [chunk,setChunk] = useState('');
 
   const [modalVisible, setModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [loadingVisible, setLodalVisible] = useState(false);
   const [cardVisiblity, setCardVisiblity] = useState(false);
-  const [historic, setHistoric] = useState(true);
+  // const [historic, setHistoric] = useState(true);
 
   
   const [name, setName] = useState('');
   const [butt, setButt] = useState(false);
   const cardRef = useRef();
   // On component mount
- 
 
-  function onChange(newValue) {
-    console.log("change", newValue);
-  }
-  
+  // useEffect(() => {
+  //   function handleKeyPress(event) {
+  //     if (event.shiftKey && event.key === 'R') {
+  //       console.log('RR')
+  //       setRole(prevRole => !prevRole);
+  //     }
+  //   }
+
+  //   window.addEventListener('keydown', handleKeyPress);
+
+  //   return () => {
+  //     window.removeEventListener('keydown', handleKeyPress);
+  //   }
+  // }, []);
+
   
 
   useEffect(() => {
@@ -154,10 +164,10 @@ const FForm = (props) => {
       const seperatedprompt = devideTextAndCode(message.prompt, true);
 
       const seperatedResCards = seperatedres.map(item => (
-        <div key={item.content}>
+          <div key={item.content}>
           {item.type === 'text' && <div dangerouslySetInnerHTML={{ __html: item.content }} />}
           {item.type === 'code' && renderAceEditor(item.content)}
-        </div>
+          </div>
       ));
       const seperatedPromptCards = seperatedprompt.map(item => (
         <div key={item.content}>
@@ -185,11 +195,12 @@ const FForm = (props) => {
     try {
       if(!name || !history) return 
       // console.log(history)
+      
       const res = await fetch(`http://localhost:3002/playground/messages?name=${name}&x=${history}`);
       const data = await res.json();
 
       setMessages(data.messages);
-      // console.log(messages);
+      console.log('fetch hist');
     } catch (err) {
       console.error(err);
     };
@@ -200,7 +211,7 @@ const fetchNames = async () => {
   try {
     const res = await fetch('http://localhost:3002/playground/names');
     const data = await res.json();
-    console.log(data.name)
+    console.log('fetch names');
     setNames(data.name);
   } catch (err) {
     console.error(err);
@@ -256,6 +267,7 @@ const handleDeleteName = async () => {
     if (submit !== 'submitted' || prompt === '') {
       return;
     }
+    console.log('submitted');
     const url = new URL('http://localhost:3002/gptstream');
     url.searchParams.append('prompt', prompt);
     url.searchParams.append('name', name);
@@ -295,6 +307,7 @@ const handleDeleteName = async () => {
 
 return (
 <ConfigProvider
+  // onKeyDown={e => {if (e.key === 'r' && e.shiftKey) setRole(!role);}}
   style={{fontFamily:'monospace'}}
   theme={{
     algorithm: theme.darkAlgorithm,
@@ -359,8 +372,9 @@ return (
       <div> 
         <div style={{ position: 'relative', height: '20vh', marginBottom:'130px' }}
                       onKeyDown={e => {if (e.key === 'Enter' && e.ctrlKey) handleSubmit(e);}}>
+                                    <AudioRecorder/>
+
             <AceInput prompt={prompt} onChange={onChange} />
-            <AudioRecorder/>
 
             <Button
               disabled={butt}
@@ -461,11 +475,20 @@ return (
               step={1}
             />
                     <br/><br/>
-            Role:
+                    <Switch 
+              size="small" 
+              checked={role} 
+              onChange={() => {
+                        setRole(!role);
+              }}>
+            </Switch> 
+                    Role:
+          { role && (
+            
             <TextArea value={system} 
                     placeholder="You are a helpful agent"
                     autoSize={{ minRows: 3, maxRows: 5 }}
-                    onChange={e => setSystem(e.target.value)} />
+                    onChange={e => setSystem(e.target.value)} />)}
 
           </label>
           <br />

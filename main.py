@@ -9,6 +9,15 @@ from engines import query_engines, query_gpt, query_gpt_api_stream
 import os
 from dotenv import load_dotenv
 from openai_api import pg_history_from_db
+import mysql.connector
+
+# mydb = mysql.connector.connect(
+#   host="localhost",
+#   user="yourusername",
+#   password="yourpassword"
+# )
+
+# print(mydb)
 
 load_dotenv()
     
