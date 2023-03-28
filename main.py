@@ -6,6 +6,7 @@ from flask_cors import CORS
 from flask import Response
 from revChatGPT.V1 import Chatbot
 from engines import query_engines, query_gpt, query_gpt_api_stream
+from db_connection import make_chatbot
 import os
 from dotenv import load_dotenv
 from openai_api import pg_history_from_db
@@ -31,6 +32,28 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     return response
+
+
+@app.route('/makechatbot', methods=['POST'])
+def handle_make_chatbot():
+    if request.method == 'OPTIONS':
+        print('OPTIONSSSSSS')
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        }
+        return ('', 204, headers)
+    else:
+        print('POST METHOD')
+        headers = {'Access-Control-Allow-Origin': '*'}
+        data = request.get_json()
+        response = make_chatbot(data)
+        resp =  make_response(jsonify({"result": response}))
+        resp.headers.add('Access-Control-Allow-Origin', '*')
+        return resp
+
+
 
 @app.route('/gptstream', methods=['GET'])
 def handle_gpt_stream():

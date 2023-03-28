@@ -1,11 +1,12 @@
 
 from openai_api import playground, gpt_api, gpt_stream
-from embedding import response_to_db,translate_prompt
+from embedding import translate_prompt
 import openai
 import embedding
 import embed
 import sqlite3
 import time
+from db_connection import response_to_db
 
 def query_engines(data):
         print(data)

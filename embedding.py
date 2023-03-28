@@ -75,15 +75,6 @@ def query(prompt):
     print('FORMATTED SOURCES',response.get_formatted_sources())
     return response
 
-def response_to_db(name, response, engine, prompt, tokens=''):
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    print(response)
-    now_time = int(time.time())
-    c.execute("CREATE TABLE IF NOT EXISTS playground(id TEXT, name TEXT, model TEXT, prompt TEXT, all_choices TEXT, best_choice_text TEXT, time INTEGER, tokens INTEGER, tick BOOL)")
-    c.execute("INSERT INTO playground (id, name, model, prompt, all_choices, best_choice_text, time, tokens, tick) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", ('',name, engine, prompt, '', response, now_time, tokens, False))
-    conn.commit()
-    conn.close()
 
 def check_language(prompt):
     translator = Translator()
