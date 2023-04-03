@@ -1,16 +1,15 @@
 
 import sqlite3
-import time
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from flask import Response
 from revChatGPT.V1 import Chatbot
-from engines import query_engines, query_gpt, query_gpt_api_stream
-from db_connection import make_chatbot
+from engines import query_engines, query_gpt, query_gpt_api_stream, query_custom_chatbot
+from db_connection import make_chatbot, chatbots_list
 import os
 from dotenv import load_dotenv
 from openai_api import pg_history_from_db
-import mysql.connector
+# import mysql.connector
 
 # mydb = mysql.connector.connect(
 #   host="localhost",
@@ -33,8 +32,30 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     return response
 
+@app.route('/chatbotslist', methods=['GET', 'OPTIONS'])
+def chatbot_names():
+    if request.method == 'OPTIONS':
+        print('OPTIONSSSSSS')
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        }
+        return ('', 204, headers)
+    else:
+        print('GET METHOD')
 
-@app.route('/makechatbot', methods=['POST'])
+        headers = {'Access-Control-Allow-Origin': '*',
+                               'Access-Control-Allow-Methods': 'POST'}
+
+        print('chatbotslist allowed')
+
+        response = chatbots_list()
+        resp =  make_response(jsonify({"chatbots_list": response}))
+        resp.headers.add('Access-Control-Allow-Origin', '*')
+        return resp
+
+@app.route('/makechatbot', methods=['POST', 'OPTIONS'])
 def handle_make_chatbot():
     if request.method == 'OPTIONS':
         print('OPTIONSSSSSS')
@@ -46,12 +67,40 @@ def handle_make_chatbot():
         return ('', 204, headers)
     else:
         print('POST METHOD')
-        headers = {'Access-Control-Allow-Origin': '*'}
+
+        headers = {'Access-Control-Allow-Origin': '*',
+                               'Access-Control-Allow-Methods': 'POST'}
+
+        print('allowed')
+
         data = request.get_json()
+        print(data)
         response = make_chatbot(data)
+        # response = 'salam'
         resp =  make_response(jsonify({"result": response}))
         resp.headers.add('Access-Control-Allow-Origin', '*')
         return resp
+    
+@app.route('/<name>', methods=['POST', 'OPTIONS'])
+def handle_chatbot_request(name):
+    
+    if request.method == 'OPTIONS':
+        print('OPTIONSSSSSS')
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        }
+        return ('', 204, headers)
+    else:
+        print('POST METHOD')
+        print(name)
+        headers = {'Access-Control-Allow-Origin': '*'}
+        data = request.get_json()
+        # response = query_custom_chatbot(data, name)
+        result = Response(query_custom_chatbot(data, name), mimetype='text/event-stream')
+        result.headers.add('Access-Control-Allow-Origin', '*')
+        return result
 
 
 

@@ -3,10 +3,11 @@ import { useState } from 'react';
 import FForm from './Form';
 // import { useHandleConversationNameChange } from './handleConversationNameChange';
 // import Playground from './Playground';
-import Embedding from './Embedding.js';
+// import Embedding from './Embedding.js';
+import ModelsCreation from './modelsCreation.js';
 // import GPT from './GPT.js';
 import { Space, Layout, theme, ConfigProvider, Dropdown } from 'antd';
-import { Content} from 'antd/es/layout/layout';
+import { Content } from 'antd/es/layout/layout';
 // const { Sider } = Layout;
 // const { Item: MenuItem } = Menu;
 
@@ -42,8 +43,8 @@ const App = () => {
     // },
     {
       key: '3',
-      label: 'Embedding Page',
-      onClick: () => handlePageChange('embedding'),
+      label: 'Models Page',
+      onClick: () => handlePageChange('modelspage'),
     },
     // {
     //   key: '4',
@@ -65,7 +66,7 @@ const App = () => {
 
       {page === 'conversation' && <FForm handlePageChange={handlePageChange} />}
       {/* {page === 'playground' && <Playground handlePageChange={handlePageChange} />} */}
-      {page === 'embedding' && <Embedding handlePageChange={handlePageChange} />}
+      {page === 'modelspage' && <ModelsCreation handlePageChange={handlePageChange} />}
       {/* {page === 'GPT' && <GPT handlePageChange={handlePageChange} />} */}
     </div>
   </Layout>
@@ -117,7 +118,7 @@ const App = () => {
                 </div>
                 )} */}
 
-              {page === 'embedding' && (
+              {page === 'modelspage' && (
                   <div className="header">
                     <Dropdown menu={{items}}>
                       <a onClick={(e) => e.preventDefault()}>
@@ -129,7 +130,7 @@ const App = () => {
                         </Space>
                       </a>
                     </Dropdown>
-                <Embedding handlePageChange={handlePageChange}/>
+                <ModelsCreation handlePageChange={handlePageChange}/>
                 </div> )}
 
               {/* {page === 'GPT' && (

@@ -41,6 +41,7 @@ const FForm = (props) => {
   const [system, setSystem] = useState('');
 
 
+
   // const [tick, setTick] = useState(false);
   // const [isLoading, setIsLoading] = useState(false);
 
@@ -111,7 +112,6 @@ const FForm = (props) => {
     console.log(includeHistory)
     
   }
-
 
   // CURRENT CARD
   useEffect(() => {
@@ -196,7 +196,7 @@ const FForm = (props) => {
       if(!name || !history) return 
       // console.log(history)
       
-      const res = await fetch(`http://163.5.182.90:3002/playground/messages?name=${name}&x=${history}`);
+      const res = await fetch(`http://localhost:3002/playground/messages?name=${name}&x=${history}`);
       const data = await res.json();
 
       setMessages(data.messages);
@@ -206,10 +206,9 @@ const FForm = (props) => {
     };
 };
 
-
 const fetchNames = async () => {
   try {
-    const res = await fetch('http://163.5.182.90:3002/playground/names');
+    const res = await fetch('http://localhost:3002/playground/names');
     const data = await res.json();
     console.log('fetch names');
     setNames(data.name);
@@ -218,11 +217,10 @@ const fetchNames = async () => {
   }
 }
 
-
 const handleDeleteName = async () => {
   try {
     console.log('deleting name', name);
-    await fetch(`http://163.5.182.90:3002/playground/names?name=${name}`, {
+    await fetch(`http://localhost:3002/playground/names?name=${name}`, {
       method: 'DELETE',
       headers: {
         'Access-Control-Allow-Origin': '*',
@@ -268,7 +266,7 @@ const handleDeleteName = async () => {
       return;
     }
     console.log('submitted');
-    const url = new URL('http://163.5.182.90:3002/gptstream');
+    const url = new URL('http://localhost:3002/gptstream');
     url.searchParams.append('prompt', prompt);
     url.searchParams.append('name', name);
     url.searchParams.append('hist', histSlider);

@@ -1,12 +1,55 @@
 
 from openai_api import playground, gpt_api, gpt_stream
 from embedding import translate_prompt
-import openai
+# import openai
 import embedding
 import embed
 import sqlite3
 import time
-from db_connection import response_to_db
+from db_connection import response_to_db, load_chatbot
+from dotenv import load_dotenv
+import os
+import requests
+load_dotenv()
+
+
+def query_hf_ngrok(prompt, lib_name):
+    base_url = os.environ['HF_NGROK_ADDRESS']
+    url = f"{base_url}/library/query_wiki"
+    print(url)
+    data = {'query': prompt,
+        'dataset_name': lib_name,
+        'k': 2}
+    headers = {'ngrok-skip-browser-warning': 'true'}
+    response = requests.get(url, params=data, headers=headers)
+    if response.status_code == 200:
+        res = response.json()
+        print(res['result'])
+    else:
+        print('Error:', response)
+    return res['result']
+
+def query_custom_chatbot(data, name):
+     prompt = data['prompt']
+     chatbot = load_chatbot(name)
+     hist = chatbot['hist']
+     system = chatbot['system']
+     lib_name = chatbot['lib_name']
+     is_focused = chatbot['is_focused']
+
+     if lib_name:
+        if is_focused: 
+            context = query_hf_ngrok(prompt, lib_name)
+            role_appendix = f'Answer according to this Context and dont answer anything out of this context.\nContext:{context}'
+            system += role_appendix
+        else: 
+            context = query_hf_ngrok(prompt, lib_name)
+            role_appendix = f'Answer according to this Context and add your own knowledge if the question is out of this context.\nContext:{context}'
+            system += role_appendix
+
+     for chunk in query_gpt_api_stream(name, prompt, hist, system):
+          yield chunk
+     return
 
 def query_engines(data):
         print(data)
@@ -110,12 +153,15 @@ def query_gpt(bot,conversation_name, conversation_id='', parent_message_id='', u
 def query_gpt_api_stream(name, prompt, included_hist, system):
     start_time = time.time()
     for data in gpt_stream(name, prompt, included_hist, system):
-        if time.time() - start_time > 30:
+        if time.time() - start_time > 60:
             yield f"data: TIMEOUT! TRY AGAIN\n\n"
             yield f"data: [DONE]\n\n"
             break
         print(data)
         yield data
+
+# query_hf_ngrok('who is tony montana?', 'tonymontana')
+
           
 
 
