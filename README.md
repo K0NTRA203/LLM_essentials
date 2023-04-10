@@ -1,5 +1,5 @@
 # LLM_essentials
-# Python clone for chatgpt/playground + embedding; Node/React UI; Saves chatlog db.
+# Python instruct + embedding; Node/React UI .
 
 ##########################################################
 # embedding doesnt have UI yet. for embedding use "embed.py"
