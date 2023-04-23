@@ -21,7 +21,7 @@ def make_chatbot(data):
     id = str(uuid.uuid4())    
     name = data['name']
     engine = data['engine']
-    max_tokens = data['maxTokens']
+    max_tokens = data['max_tokens']
     n = data['n']
     stop = data['stop']
     temperature = data['temp']
@@ -29,9 +29,10 @@ def make_chatbot(data):
     included_history = data['hist']
     lib_name = data['lib_name']
     is_focused = data['is_focused']
+    preprompt_args = data['preprompt_args']
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS chatbot(id TEXT, name TEXT, engine TEXT, max_tokens INTEGER, n INTEGER, stop TEXT, temperature FLOAT, system TEXT, included_history INTEGER, lib_name TEXT, is_focused BOOL)")
+    c.execute("CREATE TABLE IF NOT EXISTS chatbot(id TEXT, name TEXT, engine TEXT, max_tokens INTEGER, n INTEGER, stop TEXT, temperature FLOAT, system TEXT, included_history INTEGER, lib_name TEXT, is_focused BOOL, preprompt_args TEXT)")
     # check if name already exists
     c.execute("SELECT name FROM chatbot WHERE name=?", (name,))
     result = c.fetchone()
@@ -41,11 +42,12 @@ def make_chatbot(data):
         yield '[EXISTS]'
         raise ValueError("Name already exists in chatbot")
     # name does not exist, insert new record
-    c.execute("INSERT INTO chatbot (id, name, engine, max_tokens, n, stop, temperature, system, included_history, lib_name, is_focused) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-              (id, name, engine, max_tokens, n, stop, temperature, system, included_history, lib_name, is_focused))
+    c.execute("INSERT INTO chatbot (id, name, engine, max_tokens, n, stop, temperature, system, included_history, lib_name, is_focused, preprompt_args) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+              (id, name, engine, max_tokens, n, stop, temperature, system, included_history, lib_name, is_focused, preprompt_args))
     conn.commit()
     conn.close()
     return '[DONE]'
+
 
 def load_chatbot(name):
     conn = sqlite3.connect('database.db')
@@ -65,18 +67,22 @@ def load_chatbot(name):
             'system': bot[7],
             'hist': bot[8],
             'lib_name': bot[9],
-            'is_focused': bot[10]
+            'is_focused': bot[10],
+            'preprompt_args': bot[11]
         }
         return params
     else:
         return 'Chatbot not found'
 
-def response_to_db(name, response, engine, prompt, tokens=''):
+def response_to_db(name, response, engine, prompt, tokens='', id=''):
+    
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
     print(response)
     now_time = int(time.time())
     c.execute("CREATE TABLE IF NOT EXISTS playground(id TEXT, name TEXT, model TEXT, prompt TEXT, all_choices TEXT, best_choice_text TEXT, time INTEGER, tokens INTEGER, tick BOOL)")
-    c.execute("INSERT INTO playground (id, name, model, prompt, all_choices, best_choice_text, time, tokens, tick) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", ('',name, engine, prompt, '', response, now_time, tokens, False))
+    c.execute("INSERT INTO playground (id, name, model, prompt, all_choices, best_choice_text, time, tokens, tick) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (id,name, engine, prompt, '', response, now_time, tokens, False))
     conn.commit()
     conn.close()
+
+# print(chatbots_list())

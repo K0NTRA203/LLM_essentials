@@ -5,6 +5,7 @@ from flask_cors import CORS
 from flask import Response
 from revChatGPT.V1 import Chatbot
 from engines import query_engines, query_gpt, query_gpt_api_stream, query_custom_chatbot
+from transcription import transcribe
 from db_connection import make_chatbot, chatbots_list
 import os
 from dotenv import load_dotenv
@@ -81,7 +82,7 @@ def handle_make_chatbot():
         resp.headers.add('Access-Control-Allow-Origin', '*')
         return resp
     
-@app.route('/<name>', methods=['POST', 'OPTIONS'])
+@app.route('/chatbots/<name>', methods=['POST', 'OPTIONS'])
 def handle_chatbot_request(name):
     
     if request.method == 'OPTIONS':
@@ -101,8 +102,20 @@ def handle_chatbot_request(name):
         result = Response(query_custom_chatbot(data, name), mimetype='text/event-stream')
         result.headers.add('Access-Control-Allow-Origin', '*')
         return result
+        # SEND POST TO '/{MODEL_NAME}' ---> {prompt:'YOUR_PROMPT'}
 
-
+@app.route('/oga', methods=['POST'])
+def whisper_call():
+    if 'audio' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    
+    audio_file = request.files['audio']
+    if not audio_file.filename:
+        return jsonify({"error": "No file selected"}), 400
+        
+    transcription = transcribe(audio_file)
+    
+    return jsonify({"transcription": transcription}), 200
 
 @app.route('/gptstream', methods=['GET'])
 def handle_gpt_stream():

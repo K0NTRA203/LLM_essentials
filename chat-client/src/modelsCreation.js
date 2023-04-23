@@ -29,6 +29,7 @@ const ModelsCreation = () => {
   const [name, setName] = useState('');
 
 
+
   const [modalVisible, setModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
@@ -82,31 +83,32 @@ const ModelsCreation = () => {
   }
 
   const onFinish = values => {
-
-    const { name, engine, maxTokens, n, stop, temp, system, hist, lib_name, is_focused } = values;
-    
-    const formData = new FormData();
-    formData.append('name', String(name));
-    formData.append('engine', String(engine));
-    formData.append('max_tokens', parseInt(maxTokens));
-    formData.append('n', parseInt(n));
-    formData.append('stop', String(stop));
-    formData.append('temperature', parseFloat(temp));
-    formData.append('system', String(system));
-    formData.append('included_history', parseInt(hist));
-    formData.append('lib_name', String(lib_name));
-    formData.append('is_focused', Boolean(is_focused));
-    
-
-    fetch('http://localhost:3002/makechatbot', {
-      method: 'POST',
-      body: formData
+    // const { name, engine, maxTokens, n, stop, temp, system, hist, libName, isFocused, promptArgs } = values;
+    const data = {
+      name: String(name),
+      engine: String(engine),
+      max_tokens: parseInt(maxTokens),
+      n: parseInt(n),
+      stop: String(stop),
+      temp: parseFloat(temp),
+      system: String(system),
+      hist: parseInt(hist),
+      lib_name: String(libName),
+      is_focused: Boolean(isFocused),
+      preprompt_args: String(promptArgs)
+    };
+    fetch('http://localhost:3002/makechatbot', { 
+      method: 'POST', 
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
     }).then(res => {
       if (res.status === 200) {
         alert('Chatbot model created successfully!');
         form.resetFields();
       } else {
-        console.log(formData);
+        console.log(data);
         alert('Failed to create chatbot model.');
       }
     });
@@ -121,8 +123,9 @@ const ModelsCreation = () => {
     setSystem(newValue);    
   }
   function onArgsChange(newValue) {
-    // console.log("change", newValue);
-    setPromptArgs(newValue);    
+    setPromptArgs(newValue);   
+    console.log("change", promptArgs);
+ 
   }
 
   return (
@@ -154,7 +157,8 @@ const ModelsCreation = () => {
     system: 'you are a bot',
     hist: true,
     lib_name: '',
-    is_focused: false
+    is_focused: false,
+    preprompt_args: ''
   }}
 >
   <div style={{display: 'flex', justifyContent: 'space-between'}}>
@@ -192,6 +196,14 @@ const ModelsCreation = () => {
       <Form.Item name="stop" label="Stop Words">
         <Input />
       </Form.Item>
+      <Form.Item name="system" label="System Role">
+        <AceInput prompt={system} onChange={onSystemChange} />
+      </Form.Item>
+
+      <Form.Item name="prePrompt" label="Pre-Prompt">
+        <AceInput prompt={promptArgs} onChange={onArgsChange} />
+      </Form.Item>
+
     </div>
 
     <div style={{flex: 1, paddingLeft: 16}}>
@@ -208,37 +220,37 @@ const ModelsCreation = () => {
       </Form.Item>
 
       <Form.Item name="lib_name" label="Library Name">
-        <Input />
+        <Input />     
       </Form.Item>
 
       <Form.Item name="is_focused" label="Is Focused" valuePropName="checked">
         <Input type="checkbox" />
       </Form.Item>
-
       <Form.Item label="Chatbot List">
+
         <Slider min={0} max={chatbots.length - 1} onChange={onChatbotSliderChange} />
         <div>{selectedChatbot}</div>
       </Form.Item>
+
+
+
+    <Form.Item label="">
+
+      <Button type="primary" htmlType="submit">
+      Create Model
+    </Button>
+    </Form.Item>
+
     </div>
   </div>
 
 </Form>
     {/* </Sider> */}
-        System Role:
-        <br/>
-        <AceInput prompt={system} onChange={onSystemChange} />
-
-
-        Pre-Prompt Args:
-        <br/>
-        <AceInput prompt={promptArgs} onChange={onArgsChange} />
 
     </Content>
 
   <Form.Item wrapperCol={{ offset: 6, span: 12 }}>
-    <Button type="primary" htmlType="submit">
-      Create Model
-    </Button>
+
   </Form.Item>
 
     </Layout>

@@ -30,26 +30,26 @@ def query_hf_ngrok(prompt, lib_name):
     return res['result']
 
 def query_custom_chatbot(data, name):
-     prompt = data['prompt']
-     chatbot = load_chatbot(name)
-     hist = chatbot['hist']
-     system = chatbot['system']
-     lib_name = chatbot['lib_name']
-     is_focused = chatbot['is_focused']
+    chatbot = load_chatbot(name)
+    prompt = data['prompt']
+    hist = chatbot['hist']
+    system = chatbot['system']
+    lib_name = chatbot['lib_name']
+    is_focused = chatbot['is_focused']
 
-     if lib_name:
+    if lib_name:
         if is_focused: 
             context = query_hf_ngrok(prompt, lib_name)
-            role_appendix = f'Answer according to this Context and dont answer anything out of this context.\nContext:{context}'
+            role_appendix = f'Answer according to this Context and dont answer anything out of this Context.\nContext:{context}'
             system += role_appendix
         else: 
             context = query_hf_ngrok(prompt, lib_name)
-            role_appendix = f'Answer according to this Context and add your own knowledge if the question is out of this context.\nContext:{context}'
+            role_appendix = f'Answer according to this Context and use your own knowledge-base if the question is out of this Context.\nContext:{context}'
             system += role_appendix
 
-     for chunk in query_gpt_api_stream(name, prompt, hist, system):
-          yield chunk
-     return
+    for chunk in query_gpt_api_stream(name, prompt, hist, system):
+        yield chunk
+    return
 
 def query_engines(data):
         print(data)
