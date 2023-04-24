@@ -20,7 +20,7 @@ def convert_oga_wav(oga_file_path, wav_file_path):
 
   return wav_file_path
 
-def transcribe(audio_file):
+def transcribe(audio_file, language):
     filename = secure_filename(audio_file.filename)
     tmp_dir = '/tmp'
     if not os.path.exists(tmp_dir):
@@ -29,7 +29,7 @@ def transcribe(audio_file):
     audio_file.save(tmp_file)
     convert_oga_wav(tmp_file, os.path.join(tmp_dir, 'x.wav'))
     audio_file = open(os.path.join(tmp_dir, 'x.wav'), "rb")
-    transcription = openai.Audio.transcribe("whisper-1", audio_file, language='fa')['text']
+    transcription = openai.Audio.transcribe("whisper-1", audio_file, language=language)['text']
     os.remove(tmp_file)
     os.remove(os.path.join(tmp_dir, 'x.wav'))
     return transcription

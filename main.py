@@ -110,10 +110,11 @@ def whisper_call():
         return jsonify({"error": "No file uploaded"}), 400
     
     audio_file = request.files['audio']
+    language = request.files['language']
     if not audio_file.filename:
         return jsonify({"error": "No file selected"}), 400
         
-    transcription = transcribe(audio_file)
+    transcription = transcribe(audio_file, language)
     
     return jsonify({"transcription": transcription}), 200
 
